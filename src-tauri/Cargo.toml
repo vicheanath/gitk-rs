@@ -2,8 +2,8 @@
 name = "gitk-rs"
 version = "1.0.2"
 description = "A modern GitK clone written in Rust"
-authors = ["you"]
-license = ""
+authors = ["Vichea Nath"]
+license = "MIT"
 repository = ""
 edition = "2021"
 

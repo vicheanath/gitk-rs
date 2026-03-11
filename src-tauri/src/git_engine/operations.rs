@@ -8,23 +8,6 @@ pub fn open_repo(path: &Path) -> anyhow::Result<Repository> {
     Repository::open(path).map_err(|e| anyhow::anyhow!("Failed to open repository: {}", e))
 }
 
-pub fn get_commits(repo: &Repository, max_count: usize) -> anyhow::Result<Vec<CommitNode>> {
-    let mut revwalk = repo.revwalk()?;
-    revwalk.push_head()?;
-    
-    let mut commits = Vec::new();
-    for (i, oid) in revwalk.enumerate() {
-        if i >= max_count {
-            break;
-        }
-        let oid = oid?;
-        let commit = repo.find_commit(oid)?;
-        commits.push(CommitNode::from_commit(&commit));
-    }
-    
-    Ok(commits)
-}
-
 pub fn get_branches(repo: &Repository) -> anyhow::Result<Vec<BranchInfo>> {
     let mut branches = Vec::new();
     let head = repo.head()?;
@@ -581,5 +564,160 @@ pub struct WorkingTreeFile {
     pub conflicted: bool,
     pub staged_status: Option<String>,
     pub unstaged_status: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use git2::Oid;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn make_temp_repo_path(test_name: &str) -> std::path::PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos();
+        std::env::temp_dir().join(format!("gitk-rs-ops-{test_name}-{nanos}"))
+    }
+
+    fn init_repo(test_name: &str) -> Repository {
+        let path = make_temp_repo_path(test_name);
+        fs::create_dir_all(&path).expect("create temp repo dir");
+        Repository::init(&path).expect("init repository")
+    }
+
+    fn commit_file(repo: &Repository, file_name: &str, content: &str, message: &str) -> Oid {
+        let workdir = repo.workdir().expect("workdir");
+        fs::write(workdir.join(file_name), content).expect("write file");
+
+        let mut index = repo.index().expect("index");
+        index.add_path(Path::new(file_name)).expect("add path");
+        index.write().expect("write index");
+
+        let tree_id = index.write_tree().expect("write tree");
+        let tree = repo.find_tree(tree_id).expect("find tree");
+        let sig = Signature::now("Test", "test@example.com").expect("signature");
+
+        match repo.head() {
+            Ok(head) => {
+                let parent = head
+                    .target()
+                    .and_then(|oid| repo.find_commit(oid).ok())
+                    .expect("parent commit");
+                repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[&parent])
+                    .expect("create commit")
+            }
+            Err(_) => repo
+                .commit(Some("HEAD"), &sig, &sig, message, &tree, &[])
+                .expect("create initial commit"),
+        }
+    }
+
+    #[test]
+    fn map_status_returns_expected_labels() {
+        assert_eq!(map_status(Status::INDEX_NEW, true), Some("added".to_string()));
+        assert_eq!(
+            map_status(Status::INDEX_MODIFIED, true),
+            Some("modified".to_string())
+        );
+        assert_eq!(
+            map_status(Status::WT_NEW, false),
+            Some("untracked".to_string())
+        );
+        assert_eq!(
+            map_status(Status::WT_DELETED, false),
+            Some("deleted".to_string())
+        );
+        assert_eq!(map_status(Status::empty(), true), None);
+    }
+
+    #[test]
+    fn open_repo_errors_for_missing_path() {
+        let bad_path = Path::new("/definitely/not/a/repo/path");
+        let result = open_repo(bad_path);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn working_tree_status_is_sorted_by_path() {
+        let repo = init_repo("status-sorted");
+        let workdir = repo.workdir().expect("workdir");
+        fs::write(workdir.join("z_file.txt"), "z").expect("write z");
+        fs::write(workdir.join("a_file.txt"), "a").expect("write a");
+
+        let status = get_working_tree_status(&repo).expect("status");
+        let paths: Vec<String> = status.into_iter().map(|f| f.path).collect();
+
+        assert_eq!(paths, vec!["a_file.txt".to_string(), "z_file.txt".to_string()]);
+    }
+
+    #[test]
+    fn search_commits_respects_query_and_limit() {
+        let repo = init_repo("search");
+        commit_file(&repo, "a.txt", "one", "initial setup");
+        commit_file(&repo, "a.txt", "two", "fix search behavior");
+        commit_file(&repo, "a.txt", "three", "fix another bug");
+
+        let results = search_commits(&repo, "fix", 1).expect("search commits");
+        assert_eq!(results.len(), 1);
+        assert!(results[0].message.to_lowercase().contains("fix"));
+    }
+
+    #[test]
+    fn commit_staged_rejects_empty_message() {
+        let repo = init_repo("commit-empty-message");
+        let err = commit_staged(&repo, "   ").expect_err("expected message validation error");
+        assert!(err.to_string().contains("Commit message is required"));
+    }
+
+    #[test]
+    fn commit_staged_requires_staged_changes() {
+        let repo = init_repo("commit-no-staged");
+        commit_file(&repo, "a.txt", "one", "initial commit");
+
+        let err = commit_staged(&repo, "new commit").expect_err("expected staged changes validation");
+        assert!(err.to_string().contains("No staged changes to commit"));
+    }
+
+    #[test]
+    fn stage_then_unstage_path_updates_status_flags() {
+        let repo = init_repo("stage-unstage");
+        commit_file(&repo, "a.txt", "one", "initial commit");
+
+        let workdir = repo.workdir().expect("workdir");
+        fs::write(workdir.join("a.txt"), "two").expect("modify file");
+
+        stage_paths(&repo, &["a.txt".to_string()]).expect("stage path");
+        let staged_status = get_working_tree_status(&repo).expect("status after stage");
+        let staged = staged_status
+            .iter()
+            .find(|f| f.path == "a.txt")
+            .expect("status entry");
+        assert!(staged.staged);
+
+        unstage_paths(&repo, &["a.txt".to_string()]).expect("unstage path");
+        let unstaged_status = get_working_tree_status(&repo).expect("status after unstage");
+        let unstaged = unstaged_status
+            .iter()
+            .find(|f| f.path == "a.txt")
+            .expect("status entry");
+        assert!(!unstaged.staged);
+        assert!(unstaged.unstaged);
+    }
+
+    #[test]
+    fn unstaged_diff_contains_patch_content() {
+        let repo = init_repo("unstaged-diff");
+        commit_file(&repo, "a.txt", "one", "initial commit");
+
+        let workdir = repo.workdir().expect("workdir");
+        fs::write(workdir.join("a.txt"), "two").expect("modify file");
+
+        let diff = get_working_tree_diff(&repo, Some("a.txt"), false, Some(3), Some(false))
+            .expect("generate unstaged diff");
+
+        assert!(diff.contains("diff --git"));
+        assert!(diff.contains("a.txt"));
+    }
 }
 

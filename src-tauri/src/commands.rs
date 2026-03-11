@@ -43,7 +43,6 @@ pub fn open_repository(path: String) -> Result<(), String> {
     
     let state = Arc::new(Mutex::new(AppState {
         repo_path: Some(repo_path.clone()),
-        selected_commit: None,
         active_branch: repo.head().ok().and_then(|h| h.shorthand().map(|s| s.to_string())),
     }));
     
