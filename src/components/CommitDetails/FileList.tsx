@@ -19,20 +19,20 @@ export default function FileList({
 
   if (isEmpty) {
     return (
-      <div className="p-3 text-xs text-[var(--text-secondary)]">
+      <div className="p-2 text-xs text-[var(--text-secondary)]">
         <p>No files changed</p>
       </div>
     );
   }
 
   return (
-    <div className="p-2">
-      <ul className="space-y-1">
+    <div className="p-1.5">
+      <ul className="space-y-0.5">
         {rows.map(({ file, selected, icon, color }) => (
           <li
             key={file.path}
-            className={`flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-[var(--bg-secondary)] ${
-              selected ? "bg-[var(--bg-secondary)]" : ""
+            className={`flex cursor-pointer items-center gap-1.5 rounded px-1.5 py-1 text-xs transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_72%,transparent)] ${
+              selected ? "bg-[color-mix(in_srgb,var(--bg-tertiary)_80%,transparent)]" : ""
             }`}
             onClick={() => onFileSelect(file.path)}
           >

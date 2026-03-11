@@ -4,7 +4,6 @@ import DiffViewer from "./DiffViewer";
 import TreeView from "./TreeView";
 import ResizableDivider from "../ResizableDivider/ResizableDivider";
 import { Button } from "../ui/button";
-import { Card, CardContent } from "../ui/card";
 import { Input } from "../ui/input";
 import { cn } from "../../lib/utils";
 import { CommitNode } from "../../types/git";
@@ -96,12 +95,12 @@ export default function CommitDetails({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-2 bg-[var(--bg-primary)] p-2">
-      <Card className="p-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="flex h-full min-h-0 flex-col gap-1.5 bg-[var(--bg-primary)] p-1.5">
+      <div className="rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_80%,transparent)] px-2 py-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-1.5">
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Commit</span>
-            <span className="rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-xs text-[var(--text-primary)]">
+            <span className="rounded bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-xs text-[var(--text-primary)]">
               {details.id.substring(0, 8)}
             </span>
             <span className="text-[10px] text-[var(--text-muted)]">{rowNumber}/{totalCommits}</span>
@@ -132,65 +131,81 @@ export default function CommitDetails({
             <span className="text-[var(--danger)]">-{fileStats.deletions}</span>
           </div>
         </div>
-      </Card>
+      </div>
 
-      <Card>
-        <CardContent className="space-y-2">
-          <div className="grid grid-cols-[82px_1fr] gap-2 text-xs">
+      <div className="rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_72%,transparent)] p-2">
+        <div className="space-y-1.5">
+          <div className="grid grid-cols-[78px_1fr] gap-1.5 text-xs">
             <span className="uppercase tracking-wide text-[var(--text-muted)]">SHA</span>
-            <code className="overflow-x-auto rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] px-1.5 py-1 font-mono text-[var(--text-primary)]">
+            <code className="overflow-x-auto rounded bg-[var(--bg-primary)] px-1.5 py-1 font-mono text-[var(--text-primary)]">
               {details.id}
             </code>
           </div>
-          <div className="grid grid-cols-[82px_1fr] gap-2 text-xs">
+          <div className="grid grid-cols-[78px_1fr] gap-1.5 text-xs">
             <span className="uppercase tracking-wide text-[var(--text-muted)]">Author</span>
             <span className="text-[var(--text-primary)]">{details.author} &lt;{details.email}&gt;</span>
           </div>
-          <div className="grid grid-cols-[82px_1fr] gap-2 text-xs">
+          <div className="grid grid-cols-[78px_1fr] gap-1.5 text-xs">
             <span className="uppercase tracking-wide text-[var(--text-muted)]">Committer</span>
             <span className="text-[var(--text-primary)]">
               {details.committer} &lt;{details.committer_email}&gt;
             </span>
           </div>
-          <div className="grid grid-cols-[82px_1fr] gap-2 text-xs">
+          <div className="grid grid-cols-[78px_1fr] gap-1.5 text-xs">
             <span className="uppercase tracking-wide text-[var(--text-muted)]">Message</span>
-            <pre className="whitespace-pre-wrap rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] px-2 py-1.5 text-[var(--text-primary)]">
+            <pre className="whitespace-pre-wrap rounded bg-[var(--bg-primary)] px-2 py-1.5 text-[var(--text-primary)]">
               {details.message}
             </pre>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1 rounded border border-[var(--border-primary)] p-1">
+      <div className="rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_72%,transparent)] p-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <div className="inline-flex items-center gap-1 rounded bg-[var(--bg-primary)] p-1">
             <Button
-              variant={navigatorMode === "tree" ? "default" : "ghost"}
-              className="h-6"
+              variant="tab"
+              className={cn(
+                "h-6 px-2",
+                navigatorMode === "tree" &&
+                  "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+              )}
               onClick={() => setNavigatorMode("tree")}
             >
               Tree
             </Button>
             <Button
-              variant={navigatorMode === "files" ? "default" : "ghost"}
-              className="h-6"
+              variant="tab"
+              className={cn(
+                "h-6 px-2",
+                navigatorMode === "files" &&
+                  "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+              )}
               onClick={() => setNavigatorMode("files")}
             >
               Files
             </Button>
           </div>
 
-          <div className="inline-flex items-center gap-1 rounded border border-[var(--border-primary)] p-1">
+          <div className="inline-flex items-center gap-1 rounded bg-[var(--bg-primary)] p-1">
             <Button
-              variant={diffDisplayMode === "unified" ? "default" : "ghost"}
-              className="h-6"
+              variant="tab"
+              className={cn(
+                "h-6 px-2",
+                diffDisplayMode === "unified" &&
+                  "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+              )}
               onClick={() => setDiffDisplayMode("unified")}
             >
               Unified
             </Button>
             <Button
-              variant={diffDisplayMode === "split" ? "default" : "ghost"}
-              className="h-6"
+              variant="tab"
+              className={cn(
+                "h-6 px-2",
+                diffDisplayMode === "split" &&
+                  "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+              )}
               onClick={() => setDiffDisplayMode("split")}
             >
               Split
@@ -223,12 +238,12 @@ export default function CommitDetails({
             />
             Ignore whitespace
           </label>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <div className="flex min-h-0 flex-1 gap-2">
-        <aside className="min-h-0 overflow-hidden rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)]" style={{ width: `${sidebarWidth}%` }}>
-          <div className="border-b border-[var(--border-primary)] px-2 py-1.5 text-xs font-medium text-[var(--text-secondary)]">
+      <div className="flex min-h-0 flex-1 gap-1.5">
+        <aside className="min-h-0 overflow-hidden rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_84%,transparent)]" style={{ width: `${sidebarWidth}%` }}>
+          <div className="px-2 py-1.5 text-xs font-medium text-[var(--text-secondary)]">
             Changed files ({details.files.length})
           </div>
           <div className="min-h-0 h-[calc(100%-30px)] overflow-auto">
@@ -250,7 +265,7 @@ export default function CommitDetails({
         </aside>
         <ResizableDivider direction="vertical" onResize={handleSidebarResize} />
 
-        <section className="min-h-0 flex-1 overflow-hidden rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+        <section className="min-h-0 flex-1 overflow-hidden rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_84%,transparent)]">
           {!selectedFile ? (
             <div className="flex h-full items-center justify-center p-4">
               <p className="text-sm text-[var(--text-secondary)]">Select a file to view its changes</p>
@@ -267,9 +282,9 @@ export default function CommitDetails({
               showAllFilesInDiff
             />
           ) : (
-            <div className="grid h-full min-h-0 grid-cols-2 gap-2 p-2 max-[980px]:grid-cols-1">
-              <div className="min-h-0 overflow-hidden rounded border border-[var(--border-primary)]">
-                <div className="border-b border-[var(--border-primary)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">Old</div>
+            <div className="grid h-full min-h-0 grid-cols-2 gap-1 p-1 max-[980px]:grid-cols-1">
+              <div className="min-h-0 overflow-hidden rounded bg-[var(--bg-primary)]">
+                <div className="px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">Old</div>
                 <DiffViewer
                   commitId={commitId}
                   files={details.files}
@@ -280,8 +295,8 @@ export default function CommitDetails({
                   showAllFilesInDiff={false}
                 />
               </div>
-              <div className="min-h-0 overflow-hidden rounded border border-[var(--border-primary)]">
-                <div className="border-b border-[var(--border-primary)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">New</div>
+              <div className="min-h-0 overflow-hidden rounded bg-[var(--bg-primary)]">
+                <div className="px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">New</div>
                 <DiffViewer
                   commitId={commitId}
                   files={details.files}

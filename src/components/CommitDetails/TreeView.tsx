@@ -39,12 +39,12 @@ export default function TreeView({
     const isDirectory = node.type === "tree";
 
     return (
-      <div key={node.path} className="space-y-1">
+      <div key={node.path} className="space-y-0.5">
         <div
-          className={`flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs transition-colors hover:bg-[var(--bg-secondary)] ${
-            isSelected ? "bg-[var(--bg-secondary)]" : ""
+          className={`flex cursor-pointer items-center gap-1 rounded px-1.5 py-1 text-xs transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_72%,transparent)] ${
+            isSelected ? "bg-[color-mix(in_srgb,var(--bg-tertiary)_80%,transparent)]" : ""
           }`}
-          style={{ paddingLeft: `${level * 16 + 8}px` }}
+          style={{ paddingLeft: `${level * 14 + 6}px` }}
           onClick={() => {
             if (isDirectory) {
               toggleExpand(node.path);
@@ -76,7 +76,7 @@ export default function TreeView({
 
   if (loading) {
     return (
-      <div className="p-3 text-xs text-[var(--text-secondary)]">
+      <div className="p-2 text-xs text-[var(--text-secondary)]">
         <p>Loading tree...</p>
       </div>
     );
@@ -84,15 +84,15 @@ export default function TreeView({
 
   if (tree.length === 0) {
     return (
-      <div className="p-3 text-xs text-[var(--text-secondary)]">
+      <div className="p-2 text-xs text-[var(--text-secondary)]">
         <p>No files in this commit</p>
       </div>
     );
   }
 
   return (
-    <div className="p-2">
-      <div className="mb-2 flex items-center justify-between">
+    <div className="p-1.5">
+      <div className="mb-1.5 flex items-center justify-between">
         <h3 className="text-xs font-medium text-[var(--text-secondary)]">File Tree</h3>
         <span className="text-[10px] text-[var(--text-muted)]">
           {itemCount} item{itemCount !== 1 ? "s" : ""}

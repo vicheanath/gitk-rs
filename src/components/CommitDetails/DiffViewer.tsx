@@ -176,14 +176,14 @@ export default function DiffViewer({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="border-b border-[var(--border-primary)] px-2 py-1.5">
+      <div className="px-2 py-1 text-[var(--text-muted)]">
         <span className="text-xs text-[var(--text-secondary)]">
           {loading
             ? "Loading..."
             : `${files.length} file${files.length !== 1 ? "s" : ""} changed • +${totalAdditions} -${totalDeletions}`}
         </span>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto bg-[var(--bg-primary)] p-2 font-mono text-[11px] leading-5 text-[var(--text-secondary)]">
+      <div className="min-h-0 flex-1 overflow-auto bg-[var(--bg-primary)] px-2 pb-2 pt-1 font-mono text-[11px] leading-5 text-[var(--text-secondary)]">
         {loading && <p>Loading...</p>}
         {!loading && (!content || content.trim().length === 0) && (
           <p>No diff content available</p>

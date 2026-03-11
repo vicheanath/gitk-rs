@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { cn } from "../../lib/utils";
 
 interface ResizableDividerProps {
   direction: "horizontal" | "vertical";
@@ -63,11 +64,26 @@ export default function ResizableDivider({
   const cursor = direction === "vertical" ? "col-resize" : "row-resize";
   const dimension = direction === "vertical" ? "width" : "height";
   const size = direction === "vertical" ? "4px" : "4px";
+  const edgeBorders =
+    direction === "vertical"
+      ? "border-x border-transparent"
+      : "border-y border-transparent";
+  const activeBorders =
+    direction === "vertical"
+      ? "border-l-[var(--accent)] border-r-[var(--accent)]"
+      : "border-t-[var(--accent)] border-b-[var(--accent)]";
 
   return (
     <div
       ref={dividerRef}
-      className={`resizable-divider resizable-divider-${direction} ${className} ${isDragging ? "dragging" : ""} ${isHovered ? "hovered" : ""}`}
+      className={cn(
+        "relative z-10 shrink-0 bg-transparent transition-colors",
+        edgeBorders,
+        (isHovered || isDragging) && "bg-[rgba(59,130,246,0.2)]",
+        (isHovered || isDragging) && activeBorders,
+        isDragging && "bg-[var(--accent)]",
+        className
+      )}
       style={{
         cursor,
         [dimension]: size,

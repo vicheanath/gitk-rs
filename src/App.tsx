@@ -22,6 +22,7 @@ import { useEditorTabsViewModel } from "./viewmodels/useEditorTabsViewModel";
 import Sidebar from "./components/Sidebar/Sidebar";
 import SearchBar, { SearchBarRef } from "./components/SearchBar";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import { cn } from "./lib/utils";
 import "./styles/App.css";
 import "./styles/CommitGraphList.css";
 
@@ -138,11 +139,11 @@ function App() {
 
   if (!isRepoOpen) {
     return (
-      <div className="app">
+      <div className="flex h-screen w-full flex-col overflow-hidden">
         <div className="min-h-screen w-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-          <div className="mx-auto flex h-full max-w-4xl flex-col gap-6 px-6 py-14">
-            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-6 shadow-lg">
-              <div className="mb-5 flex items-center gap-3">
+          <div className="mx-auto flex h-full max-w-4xl flex-col gap-2 p-4">
+            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 shadow-lg">
+              <div className="mb-2 flex items-center gap-2">
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)] text-[var(--accent)]">
                   <FolderGit2 size={20} />
                 </span>
@@ -152,25 +153,28 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <button onClick={handleOpenRepo} className="primary-button">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleOpenRepo}
+                  className="inline-flex items-center rounded border border-[#9be9a8] bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-[#0b1117] transition hover:bg-[var(--accent-hover)] hover:shadow-[0_0_0_1px_var(--accent)]"
+                >
                   Open Repository
                 </button>
                 <button
                   onClick={() => setSettingsOpen(true)}
-                  className="secondary-button"
+                  className="inline-flex items-center rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]"
                 >
                   Settings
                 </button>
               </div>
 
-              <p className="mt-4 text-xs text-[var(--text-secondary)]">
+              <p className="mt-2 text-xs text-[var(--text-secondary)]">
                 Repository dialog will only open when you click <strong>Open Repository</strong>.
               </p>
             </div>
 
-            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5">
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
                 Connected Providers
               </h2>
               {connections.length === 0 ? (
@@ -205,10 +209,10 @@ function App() {
   }
 
   return (
-    <div className="app gitk-layout">
-      <div className="flex min-h-9 items-center gap-2 border-b border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-secondary)_94%,#000000_6%)] px-2.5 py-1 text-xs font-medium">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <div className="inline-flex shrink-0 items-center gap-1 rounded border border-[color-mix(in_srgb,var(--border-color)_88%,#ffffff_12%)] bg-[color-mix(in_srgb,var(--bg-primary)_82%,#ffffff_18%)] px-2 py-1 text-[var(--text-primary)]" aria-label="GitK-RS">
+    <div className="gitk-layout flex h-screen w-full flex-col overflow-hidden">
+      <div className="flex min-h-9 items-center gap-1 border-b border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-secondary)_94%,#000000_6%)] px-2 py-1 text-xs font-medium">
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <div className="inline-flex shrink-0 items-center gap-1 rounded border border-[color-mix(in_srgb,var(--border-color)_88%,#ffffff_12%)] bg-[color-mix(in_srgb,var(--bg-primary)_82%,#ffffff_18%)] px-1.5 py-0.5 text-[var(--text-primary)]" aria-label="GitK-RS">
             <FolderGit2 size={14} />
             <span className="font-semibold">GitK-RS</span>
           </div>
@@ -254,17 +258,24 @@ function App() {
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
       />
-      <div className="app-body">
+      <div className="flex flex-1 overflow-hidden">
         {sidebarOpen && (
           <>
-            <div className="app-sidebar" style={{ width: `${sidebarWidth}px` }}>
+            <div
+              className="w-[220px] min-w-[150px] max-w-[400px] shrink-0 overflow-y-auto border-r border-[var(--border-color)] bg-[var(--bg-secondary)] text-xs"
+              style={{ width: `${sidebarWidth}px` }}
+            >
               <Sidebar />
             </div>
             <ResizableDivider direction="vertical" onResize={handleSidebarResize} />
           </>
         )}
-        <div className="app-main">
-          <div className="app-editor-tabs" role="tablist" aria-label="Editor Tabs">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div
+            className="relative z-[2] flex shrink-0 items-stretch gap-px overflow-x-auto border-b border-[var(--border-color)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--bg-secondary)_94%,#ffffff_6%),var(--bg-secondary))] px-1.5 pb-0 pt-1 [scrollbar-width:thin]"
+            role="tablist"
+            aria-label="Editor Tabs"
+          >
             {openTabs.map((tab) => {
               const isActive = tab.id === activeTab?.id;
               const tabLabel = tab.type === "graph" ? "Graph" : `${tab.title} (${tab.commitId.slice(0, 7)})`;
@@ -272,26 +283,34 @@ function App() {
               return (
                 <div
                   key={tab.id}
-                  className={`app-editor-tab ${isActive ? "active" : ""}`}
+                  className={cn(
+                    "inline-flex min-w-0 max-w-[280px] items-center rounded-t-[0.45rem] border border-b-0 border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_88%,transparent)] text-[var(--text-secondary)]",
+                    isActive &&
+                      "border-[color-mix(in_srgb,var(--accent)_40%,var(--border-color))] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-[inset_0_2px_0_color-mix(in_srgb,var(--accent)_58%,transparent)]"
+                  )}
                   role="tab"
                   aria-selected={isActive}
                 >
                   <button
                     type="button"
-                    className="app-editor-tab-button"
+                    className="inline-flex min-w-0 max-w-full items-center gap-1 border-none bg-transparent px-2 py-1.5 text-inherit"
                     onClick={() => activateTab(tab)}
                     title={tabLabel}
                   >
                     {tab.type === "graph" ? <GitCommitHorizontal size={13} /> : null}
-                    <span className="app-editor-tab-label">{tab.type === "graph" ? tab.title : tab.title}</span>
+                    <span className="min-w-0 truncate whitespace-nowrap">
+                      {tab.type === "graph" ? tab.title : tab.title}
+                    </span>
                     {tab.type === "commit" ? (
-                      <span className="app-editor-tab-meta">{tab.commitId.slice(0, 7)}</span>
+                      <span className="whitespace-nowrap text-[10px] text-[var(--text-secondary)]">
+                        {tab.commitId.slice(0, 7)}
+                      </span>
                     ) : null}
                   </button>
                   {tab.type === "commit" ? (
                     <button
                       type="button"
-                      className="app-editor-tab-close"
+                      className="mr-1 inline-flex h-[22px] w-[22px] items-center justify-center rounded border-none bg-transparent text-inherit transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
                       onClick={() => closeTab(tab.id)}
                       title="Close tab"
                     >
@@ -303,23 +322,29 @@ function App() {
             })}
           </div>
 
-          <div className="app-tab-panel">
+          <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--bg-secondary)]">
             {activeTab?.type === "graph" ? (
-              <div ref={scrollContainerRef} className="app-graph-list-container">
+              <div
+                ref={scrollContainerRef}
+                className="app-graph-list-container relative flex min-h-0 flex-1 flex-row overflow-hidden"
+              >
                 {loadingGraph ? (
-                  <div className="graph-loading">
+                  <div className="flex h-full w-full items-center justify-center text-sm text-[var(--text-secondary)]">
                     <p>Loading commit graph...</p>
                   </div>
                 ) : graphError ? (
-                  <div className="graph-error">
-                    <div className="graph-error-content">
+                  <div className="flex h-full w-full items-center justify-center text-sm text-[var(--danger)]">
+                    <div className="flex flex-col items-center gap-2 p-2 text-center">
                       <p>Error loading graph: {graphError}</p>
-                      <div className="graph-error-actions">
-                        <button className="secondary-button" onClick={handleOpenRepo}>
+                      <div className="flex gap-2">
+                        <button
+                          className="inline-flex items-center rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]"
+                          onClick={handleOpenRepo}
+                        >
                           Open Another Repository
                         </button>
                         <button
-                          className="primary-button"
+                          className="inline-flex items-center rounded border border-[#9be9a8] bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-[#0b1117] transition hover:bg-[var(--accent-hover)] hover:shadow-[0_0_0_1px_var(--accent)]"
                           onClick={() => void loadCommitGraph()}
                         >
                           Retry
