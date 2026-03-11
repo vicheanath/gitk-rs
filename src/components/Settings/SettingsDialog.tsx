@@ -383,9 +383,13 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   onChange={(event) => setScopes(event.target.value)}
                   placeholder="repo, read_api, code"
                 />
-                <a className="shrink-0 text-[10px] text-[var(--accent)] hover:underline" href={providerPreset.docsUrl} target="_blank" rel="noreferrer">
+                <button
+                  type="button"
+                  onClick={() => void invoke("open_url", { url: providerPreset.docsUrl })}
+                  className="shrink-0 text-[10px] text-[var(--accent)] hover:underline"
+                >
                   Token docs
-                </a>
+                </button>
               </div>
             </div>
 

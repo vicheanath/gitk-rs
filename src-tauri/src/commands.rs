@@ -457,6 +457,11 @@ pub fn remove_git_auth_connection(connection_id: String) -> Result<(), String> {
     auth::remove_connection(&connection_id).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    open::that(&url).map_err(|e| format!("Failed to open URL: {}", e))
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommitGraphResponse {
     pub nodes: Vec<CommitNode>,

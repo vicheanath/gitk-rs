@@ -27,6 +27,7 @@ rayon = "1.8"
 petgraph = "0.6"
 dirs = "5"
 keyring = "2"
+open = "5"
 
 [features]
 # This feature is used for production builds or when `devPath` points to the filesystem
