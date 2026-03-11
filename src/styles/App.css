@@ -3366,6 +3366,10 @@ body {
   grid-column: 2;
 }
 
+.settings-section-auth {
+  grid-column: 1 / span 2;
+}
+
 .settings-section-title {
   font-size: 10px;
   font-weight: 700;
@@ -3520,7 +3524,8 @@ body {
   }
 
   .settings-section-appearance,
-  .settings-section-workspace {
+  .settings-section-workspace,
+  .settings-section-auth {
     grid-column: auto;
   }
 
@@ -3579,6 +3584,114 @@ body {
 .settings-number-input:focus {
   outline: none;
   border-color: var(--accent);
+}
+
+.settings-text-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 5px 8px;
+  width: 100%;
+}
+
+.settings-text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.settings-link {
+  color: var(--accent);
+  font-size: 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.settings-link:hover {
+  text-decoration: underline;
+}
+
+.settings-auth-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.settings-connect-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: #0c1117;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 12px;
+}
+
+.settings-connect-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-auth-error {
+  margin-top: 6px;
+  color: var(--danger);
+  font-size: 11px;
+}
+
+.settings-auth-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-auth-empty {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.settings-auth-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--bg-primary) 80%, transparent);
+  padding: 6px 8px;
+}
+
+.settings-auth-title {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-auth-meta {
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.settings-auth-remove-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.settings-auth-remove-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border-color));
+  color: var(--danger);
+}
+
+.settings-auth-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .settings-hint {

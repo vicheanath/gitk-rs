@@ -4,6 +4,7 @@ use tauri::{
 };
 
 mod app_core;
+mod auth;
 mod commands;
 mod git_engine;
 
@@ -103,6 +104,9 @@ pub fn run() {
             commands::commit_staged,
             commands::get_working_tree_diff,
             commands::search_commits,
+            commands::list_git_auth_connections,
+            commands::upsert_git_auth_connection,
+            commands::remove_git_auth_connection,
         ])
         .setup(|app| {
             let menu = build_native_menu(app)?;

@@ -1,4 +1,5 @@
 use crate::app_core::AppState;
+use crate::auth::{self, AuthConnection, AuthConnectionInput};
 use crate::git_engine::operations::{open_repo, BranchInfo, TagInfo, WorkingTreeFile};
 use crate::git_engine::{build_commit_graph, CommitNode};
 use git2::Repository;
@@ -439,6 +440,21 @@ pub fn get_working_tree_diff(
 pub fn search_commits(query: String) -> Result<Vec<CommitNode>, String> {
     let repo = get_repo()?;
     crate::git_engine::operations::search_commits(&repo, &query, 100).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_git_auth_connections() -> Result<Vec<AuthConnection>, String> {
+    auth::list_connections().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn upsert_git_auth_connection(input: AuthConnectionInput) -> Result<AuthConnection, String> {
+    auth::upsert_connection(input).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn remove_git_auth_connection(connection_id: String) -> Result<(), String> {
+    auth::remove_connection(&connection_id).map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Serialize, Deserialize)]

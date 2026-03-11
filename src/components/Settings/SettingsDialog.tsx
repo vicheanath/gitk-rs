@@ -1,6 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useSettings } from "../../context/SettingsContext";
 import { AppSettings, DEFAULT_SETTINGS, THEME_OPTIONS } from "../../types/settings";
+import {
+  AuthConnection,
+  AuthConnectionInput,
+  GitProvider,
+  PROVIDER_PRESETS,
+} from "../../types/auth";
 import { X } from "lucide-react";
 
 interface SettingsDialogProps {
@@ -13,6 +20,50 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const selectedTheme =
     THEME_OPTIONS.find((theme) => theme.value === settings.theme) ?? THEME_OPTIONS[0];
+  const [provider, setProvider] = useState<GitProvider>("github");
+  const [host, setHost] = useState("github.com");
+  const [username, setUsername] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [token, setToken] = useState("");
+  const [scopes, setScopes] = useState("");
+  const [connections, setConnections] = useState<AuthConnection[]>([]);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  const isTauri =
+    typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+  const providerPreset = useMemo(
+    () =>
+      PROVIDER_PRESETS.find((item) => item.provider === provider) ??
+      PROVIDER_PRESETS[0],
+    [provider]
+  );
+
+  const loadConnections = async () => {
+    if (!isTauri) {
+      setConnections([]);
+      return;
+    }
+
+    try {
+      const result = await invoke<AuthConnection[]>("list_git_auth_connections");
+      setConnections(result);
+      setAuthError(null);
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    void loadConnections();
+  }, [open]);
+
+  useEffect(() => {
+    setHost(providerPreset.defaultHost);
+    setDisplayName(providerPreset.label);
+  }, [providerPreset.defaultHost, providerPreset.label]);
 
   // Close on Escape key
   useEffect(() => {
@@ -39,6 +90,61 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   ) {
     updateSettings({ [key]: value } as Partial<AppSettings>);
   }
+
+  const handleConnect = async () => {
+    if (!isTauri) {
+      setAuthError("Provider authentication is available in the desktop app only.");
+      return;
+    }
+
+    if (!token.trim()) {
+      setAuthError("Token is required.");
+      return;
+    }
+
+    if (!displayName.trim()) {
+      setAuthError("Display name is required.");
+      return;
+    }
+
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      const payload: AuthConnectionInput = {
+        provider,
+        host: host.trim(),
+        username: username.trim() || undefined,
+        display_name: displayName.trim(),
+        token: token.trim(),
+        scopes: scopes
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      };
+      await invoke<AuthConnection>("upsert_git_auth_connection", { input: payload });
+      setToken("");
+      await loadConnections();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleDisconnect = async (connectionId: string) => {
+    if (!isTauri) return;
+
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      await invoke("remove_git_auth_connection", { connectionId });
+      await loadConnections();
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthBusy(false);
+    }
+  };
 
   return (
     <div className="settings-overlay" onMouseDown={handleBackdropClick}>
@@ -192,6 +298,130 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   Takes effect on next repository open
                 </span>
               </div>
+            </div>
+          </section>
+
+          <section className="settings-section settings-section-auth">
+            <h3 className="settings-section-title">Git Accounts</h3>
+
+            <div className="settings-row">
+              <label className="settings-label">Provider</label>
+              <div className="settings-control settings-control-grow">
+                <select
+                  className="settings-select"
+                  value={provider}
+                  onChange={(event) => setProvider(event.target.value as GitProvider)}
+                >
+                  {PROVIDER_PRESETS.map((item) => (
+                    <option key={item.provider} value={item.provider}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">Host</label>
+              <div className="settings-control settings-control-grow">
+                <input
+                  className="settings-text-input"
+                  value={host}
+                  onChange={(event) => setHost(event.target.value)}
+                  placeholder={providerPreset.defaultHost}
+                />
+              </div>
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">Username (optional)</label>
+              <div className="settings-control settings-control-grow">
+                <input
+                  className="settings-text-input"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="username"
+                />
+              </div>
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">Display name</label>
+              <div className="settings-control settings-control-grow">
+                <input
+                  className="settings-text-input"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="Work account"
+                />
+              </div>
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">{providerPreset.tokenLabel}</label>
+              <div className="settings-control settings-control-grow">
+                <input
+                  className="settings-text-input"
+                  type="password"
+                  value={token}
+                  onChange={(event) => setToken(event.target.value)}
+                  placeholder="Paste token"
+                />
+              </div>
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">Scopes (optional)</label>
+              <div className="settings-control settings-control-grow">
+                <input
+                  className="settings-text-input"
+                  value={scopes}
+                  onChange={(event) => setScopes(event.target.value)}
+                  placeholder="repo, read_api, code"
+                />
+                <a className="settings-link" href={providerPreset.docsUrl} target="_blank" rel="noreferrer">
+                  Token docs
+                </a>
+              </div>
+            </div>
+
+            <div className="settings-auth-actions">
+              <button
+                className="settings-connect-btn"
+                type="button"
+                onClick={() => void handleConnect()}
+                disabled={authBusy}
+              >
+                Connect
+              </button>
+            </div>
+
+            {authError ? <div className="settings-auth-error">{authError}</div> : null}
+
+            <div className="settings-auth-list">
+              {connections.length === 0 ? (
+                <div className="settings-auth-empty">No connected providers yet.</div>
+              ) : (
+                connections.map((connection) => (
+                  <div key={connection.id} className="settings-auth-item">
+                    <div>
+                      <div className="settings-auth-title">{connection.display_name}</div>
+                      <div className="settings-auth-meta">
+                        {connection.provider} • {connection.host}
+                        {connection.username ? ` • ${connection.username}` : ""}
+                      </div>
+                    </div>
+                    <button
+                      className="settings-auth-remove-btn"
+                      type="button"
+                      onClick={() => void handleDisconnect(connection.id)}
+                      disabled={authBusy}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </section>
           </div>
