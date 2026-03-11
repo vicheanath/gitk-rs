@@ -89,30 +89,61 @@ export function useCommitGraphListViewModel({
   }, [nodes.length]);
 
   useEffect(() => {
-    const loadCommitBranches = async () => {
-      const isTauri =
-        typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-      if (!isTauri || nodes.length === 0) return;
+    if (nodes.length === 0) {
+      setCommitBranches(new Map());
+      return;
+    }
 
-      const branchesMap = new Map<string, string[]>();
-      const loadPromises = nodes.map(async (node) => {
-        try {
-          const commitBranchNames = await invoke<string[]>("get_commit_branches", {
-            oid: node.id,
-          });
-          branchesMap.set(node.id, commitBranchNames);
-        } catch (error) {
-          console.error(`Failed to load branches for commit ${node.id}:`, error);
-          branchesMap.set(node.id, []);
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const parentsByChild = new Map<string, string[]>();
+
+    // Edges are stored as parent -> child; build child -> parents adjacency.
+    for (const edge of edges) {
+      const parents = parentsByChild.get(edge.to);
+      if (parents) {
+        parents.push(edge.from);
+      } else {
+        parentsByChild.set(edge.to, [edge.from]);
+      }
+    }
+
+    const branchSetsByCommit = new Map<string, Set<string>>();
+    for (const node of nodes) {
+      branchSetsByCommit.set(node.id, new Set());
+    }
+
+    // Walk each branch tip back through parents within the currently loaded graph.
+    for (const branch of branches) {
+      if (!nodeIds.has(branch.commit_id)) {
+        continue;
+      }
+
+      const stack = [branch.commit_id];
+      const visited = new Set<string>();
+
+      while (stack.length > 0) {
+        const commitId = stack.pop()!;
+        if (visited.has(commitId)) {
+          continue;
         }
-      });
+        visited.add(commitId);
 
-      await Promise.all(loadPromises);
-      setCommitBranches(branchesMap);
-    };
+        branchSetsByCommit.get(commitId)?.add(branch.name);
 
-    loadCommitBranches();
-  }, [nodes]);
+        const parents = parentsByChild.get(commitId);
+        if (parents) {
+          stack.push(...parents);
+        }
+      }
+    }
+
+    const branchesMap = new Map<string, string[]>();
+    for (const [commitId, names] of branchSetsByCommit) {
+      branchesMap.set(commitId, Array.from(names));
+    }
+
+    setCommitBranches(branchesMap);
+  }, [nodes, edges, branches]);
 
   useEffect(() => {
     if (nodes.length === 0) {

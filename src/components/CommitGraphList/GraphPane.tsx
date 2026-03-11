@@ -1,13 +1,11 @@
 import { CommitNode, GraphEdge } from "../../types/git";
 import { NodePosition } from "../../utils/layout/gitkLayout";
 import { getNodeColor } from "../../utils/graph/branchColors";
-import { getBranchColor } from "./branchColor";
 import { ROW_HEIGHT } from "./constants";
 
 const NODE_RADIUS = 5;
 const MERGE_NODE_RADIUS = 7;
-const EDGE_STROKE_WIDTH = 2;
-type BranchHead = { name: string; commit_id: string };
+const EDGE_STROKE_WIDTH = 1.5;
 
 function buildConnectionPath(
   fromX: number,
@@ -44,9 +42,6 @@ interface GraphPaneProps {
   positions: Map<string, NodePosition>;
   edges: GraphEdge[];
   branchColors: Map<string, string>;
-  branches: BranchHead[];
-  commitBranches: Map<string, string[]>;
-  commitTags: Map<string, string[]>;
   selectedCommit?: string;
   hoveredNode: string | null;
   onHoverNode: (id: string | null) => void;
@@ -60,9 +55,6 @@ export default function GraphPane({
   positions,
   edges,
   branchColors,
-  branches,
-  commitBranches,
-  commitTags,
   selectedCommit,
   hoveredNode,
   onHoverNode,
@@ -70,23 +62,12 @@ export default function GraphPane({
   graphWidth,
   totalHeight,
 }: GraphPaneProps) {
-  const MESSAGE_COLUMN_PADDING = 18;
-  const MESSAGE_TRIM = 96;
-
-  const trimSummary = (message: string) => {
-    const summary = message.split("\n")[0];
-    if (summary.length <= MESSAGE_TRIM) {
-      return summary;
-    }
-    return `${summary.slice(0, MESSAGE_TRIM - 1)}...`;
-  };
-
   const maxX = filteredNodes.reduce((acc, node) => {
     const pos = positions.get(node.id);
     return pos ? Math.max(acc, pos.x) : acc;
   }, 0);
   const graphColumnWidth = Math.max(graphWidth, Math.ceil(maxX + 24));
-  const svgWidth = graphColumnWidth + 1400;
+  const svgWidth = graphColumnWidth + 8;
 
   const nodeToRowIndex = new Map<string, number>();
   filteredNodes.forEach((node, idx) => nodeToRowIndex.set(node.id, idx));
@@ -105,7 +86,6 @@ export default function GraphPane({
       });
       return;
     }
-
     laneData.rows.push(rowIndex);
   });
 
@@ -118,9 +98,7 @@ export default function GraphPane({
       if (!fromPos || !toPos || fromRow === undefined || toRow === undefined) {
         return null;
       }
-      if (fromPos.lane === toPos.lane) {
-        return null;
-      }
+      if (fromPos.lane === toPos.lane) return null;
 
       return {
         key: `${edge.from}-${edge.to}`,
@@ -133,12 +111,18 @@ export default function GraphPane({
     })
     .filter((c): c is NonNullable<typeof c> => c !== null);
 
+  // Center the SVG horizontally if it's smaller than the available width
+  const svgOffset = Math.max(0, (graphWidth - svgWidth) / 2);
+
   return (
     <div className="graph-svg-wrapper" style={{ width: `${graphWidth}px` }}>
-      <svg className="graph-svg" width={svgWidth} height={totalHeight}>
+      <svg className="graph-svg" width={svgWidth} height={totalHeight} style={{ marginLeft: `${svgOffset}px` }}>
+        {/* Row highlight backgrounds (selected/hover) — drawn first, below everything */}
         {filteredNodes.map((node, rowIndex) => {
-          const rowY = Math.round(rowIndex * ROW_HEIGHT);
           const isSelected = node.id === selectedCommit;
+          const isHovered = node.id === hoveredNode;
+          if (!isSelected && !isHovered) return null;
+          const rowY = Math.round(rowIndex * ROW_HEIGHT);
           return (
             <rect
               key={`row-bg-${node.id}`}
@@ -146,13 +130,17 @@ export default function GraphPane({
               y={rowY}
               width={svgWidth}
               height={ROW_HEIGHT}
-              fill={isSelected ? "rgba(126, 231, 135, 0.09)" : "transparent"}
-              onClick={() => onCommitSelect(node.id)}
-              style={{ cursor: "pointer" }}
+              fill={
+                isSelected
+                  ? "var(--row-selected-bg)"
+                  : "var(--row-hover-bg)"
+              }
+              style={{ pointerEvents: "none" }}
             />
           );
         })}
 
+        {/* Vertical lane lines */}
         {Array.from(laneRows.entries())
           .sort(([a], [b]) => a - b)
           .map(([lane, laneData]) => {
@@ -173,19 +161,15 @@ export default function GraphPane({
                 y2={y2}
                 stroke={laneData.color}
                 strokeWidth={EDGE_STROKE_WIDTH}
-                opacity={0.85}
-                style={{ pointerEvents: "none", strokeLinecap: "round" }}
+                opacity={0.8}
+                style={{ pointerEvents: "none", strokeLinecap: "round" } as React.CSSProperties}
               />
             );
           })}
 
+        {/* Bezier cross-lane edges */}
         {horizontalConnections.map((conn) => {
-          const path = buildConnectionPath(
-            conn.fromX,
-            conn.fromY,
-            conn.toX,
-            conn.toY
-          );
+          const path = buildConnectionPath(conn.fromX, conn.fromY, conn.toX, conn.toY);
           return (
             <path
               key={conn.key}
@@ -193,12 +177,13 @@ export default function GraphPane({
               stroke={conn.color}
               strokeWidth={EDGE_STROKE_WIDTH}
               fill="none"
-              opacity={0.75}
-              style={{ pointerEvents: "none", strokeLinecap: "round", strokeLinejoin: "round" }}
+              opacity={0.7}
+              style={{ pointerEvents: "none", strokeLinecap: "round", strokeLinejoin: "round" } as React.CSSProperties}
             />
           );
         })}
 
+        {/* Commit node circles */}
         {filteredNodes.map((node, rowIndex) => {
           const pos = positions.get(node.id);
           if (!pos) return null;
@@ -208,131 +193,72 @@ export default function GraphPane({
           const isHovered = node.id === hoveredNode;
           const isMerge = node.parents.length > 1;
 
-          const radius = isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
-          let displayRadius = radius;
+          const baseRadius = isMerge ? MERGE_NODE_RADIUS : NODE_RADIUS;
+          let displayRadius = baseRadius;
           let fillColor = getNodeColor(node.id, branchColors);
-          let strokeColor = "#1e293b";
+          let strokeColor = "var(--bg-primary)";
           let strokeWidth = 1.5;
 
           if (isSelected) {
-            displayRadius = radius * 1.3;
-            fillColor = "#fbbf24";
-            strokeColor = "#f59e0b";
-            strokeWidth = 3;
+            displayRadius = baseRadius * 1.25;
+            fillColor = "var(--accent)";
+            strokeColor = "var(--accent)";
+            strokeWidth = 2;
           } else if (isHovered) {
-            displayRadius = radius * 1.5;
+            displayRadius = baseRadius * 1.35;
             strokeColor = "#ffffff";
-            strokeWidth = 2.5;
+            strokeWidth = 2;
           }
-
-          const tags = commitTags.get(node.id) || [];
-          const branchHeads = branches.filter((b) => b.commit_id === node.id);
-          const rowBranches = commitBranches.get(node.id) || [];
-          const messageX = graphColumnWidth + MESSAGE_COLUMN_PADDING;
-          const infoX = graphColumnWidth + 860;
-          const hash = node.id.slice(0, 7);
-          const summary = trimSummary(node.message);
 
           return (
             <g
               key={node.id}
               transform={`translate(${pos.x}, ${rowY})`}
-              style={{ cursor: "pointer" }}
-              onClick={() => onCommitSelect(node.id)}
-              onMouseEnter={() => onHoverNode(node.id)}
-              onMouseLeave={() => onHoverNode(null)}
+              style={{ pointerEvents: "none" }}
             >
+              {/* Drop shadow */}
               <circle
                 r={displayRadius + 0.5}
-                fill="rgba(0, 0, 0, 0.1)"
-                transform="translate(0.5, 0.5)"
-                style={{ pointerEvents: "none" }}
+                fill="rgba(0,0,0,0.2)"
+                transform="translate(0.5,0.8)"
               />
+              {/* Main node */}
               <circle
                 r={displayRadius}
                 fill={fillColor}
                 stroke={strokeColor}
                 strokeWidth={strokeWidth}
-                opacity={0.95}
               />
+              {/* Inner ring for merge commits */}
               {isMerge && (
                 <circle
-                  r={displayRadius * 0.55}
+                  r={displayRadius * 0.46}
                   fill="none"
                   stroke={strokeColor}
-                  strokeWidth={1.5}
-                  opacity={0.9}
+                  strokeWidth={1}
+                  opacity={0.75}
                 />
               )}
-
-              {tags.map((tagName, tagIdx) => (
-                <g key={`tag-${node.id}-${tagName}`} transform={`translate(${NODE_RADIUS + 4}, ${-6 + tagIdx * 10})`}>
-                  <polygon
-                    points={`0,0 ${NODE_RADIUS + 2},${NODE_RADIUS + 2} 0,${(NODE_RADIUS + 2) * 2}`}
-                    fill="#fbbf24"
-                    stroke="#f59e0b"
-                    strokeWidth={1}
-                    opacity={0.9}
-                  />
-                  <text x={NODE_RADIUS + 4} y={NODE_RADIUS + 2} fontSize="8" fill="#f59e0b" fontWeight="600">
-                    {tagName}
-                  </text>
-                </g>
-              ))}
-
-              {branchHeads.map((branch, branchIdx) => (
-                <text
-                  key={`branch-${node.id}-${branch.name}`}
-                  x={NODE_RADIUS + 6}
-                  y={-4 - branchIdx * 12}
-                  fontSize="9"
-                  fill={getBranchColor(branch.name)}
-                  fontWeight="600"
-                  style={{ pointerEvents: "none", userSelect: "none" }}
-                >
-                  {branch.name}
-                </text>
-              ))}
-
-              <text
-                x={messageX - pos.x}
-                y={4}
-                fontSize="10"
-                fill="var(--terminal-green-dim, #6b7f95)"
-                style={{ pointerEvents: "none", userSelect: "none" }}
-              >
-                {hash}
-              </text>
-              <text
-                x={messageX - pos.x + 70}
-                y={4}
-                fontSize="12"
-                fill="var(--text-primary)"
-                style={{ pointerEvents: "none", userSelect: "none" }}
-              >
-                {summary}
-              </text>
-              <text
-                x={infoX - pos.x}
-                y={4}
-                fontSize="11"
-                fill="var(--text-secondary)"
-                style={{ pointerEvents: "none", userSelect: "none" }}
-              >
-                {`${node.author}  ${new Date(node.time * 1000).toLocaleString()}`}
-              </text>
-              {rowBranches.length > 0 && (
-                <text
-                  x={infoX - pos.x + 290}
-                  y={4}
-                  fontSize="10"
-                  fill={getBranchColor(rowBranches[0])}
-                  style={{ pointerEvents: "none", userSelect: "none" }}
-                >
-                  [{rowBranches.join(", ")}]
-                </text>
-              )}
             </g>
+          );
+        })}
+
+        {/* Transparent click/hover capture rects — rendered last so they sit on top */}
+        {filteredNodes.map((node, rowIndex) => {
+          const rowY = Math.round(rowIndex * ROW_HEIGHT);
+          return (
+            <rect
+              key={`row-click-${node.id}`}
+              x={0}
+              y={rowY}
+              width={svgWidth}
+              height={ROW_HEIGHT}
+              fill="transparent"
+              onClick={() => onCommitSelect(node.id)}
+              onMouseEnter={() => onHoverNode(node.id)}
+              onMouseLeave={() => onHoverNode(null)}
+              style={{ cursor: "pointer" }}
+            />
           );
         })}
       </svg>

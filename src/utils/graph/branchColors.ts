@@ -1,15 +1,15 @@
-// Classic GitK branch colors
+// Modern git log branch colors — readable on both dark and light backgrounds
 export const CLASSIC_GITK_COLORS = [
-  "#ffff00", // Yellow
-  "#00ff00", // Green
-  "#00ffff", // Cyan
-  "#ff00ff", // Magenta
-  "#ff8000", // Orange
-  "#0080ff", // Blue
-  "#ff0080", // Pink
-  "#80ff00", // Lime
-  "#8000ff", // Purple
-  "#ff8080", // Light Red
+  "#4f9cf9", // blue
+  "#30b155", // green
+  "#e67e22", // orange
+  "#9b59b6", // purple
+  "#e84393", // pink
+  "#2ecc71", // emerald
+  "#e74c3c", // red
+  "#1abc9c", // teal
+  "#f39c12", // amber
+  "#3498db", // sky blue
 ];
 
 export interface BranchInfo {

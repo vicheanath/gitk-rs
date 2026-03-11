@@ -86,12 +86,12 @@ export function useAppViewModel(): AppViewModel {
   }, [settings.maxCommits]);
 
   useEffect(() => {
-    if (!isRepoOpen) {
+    if (!isRepoOpen || !repoPath) {
       return;
     }
 
     void loadCommitGraph();
-  }, [isRepoOpen, loadCommitGraph]);
+  }, [isRepoOpen, repoPath, loadCommitGraph]);
 
   const openRepository = useCallback(
     async (path: string) => {
@@ -106,14 +106,13 @@ export function useAppViewModel(): AppViewModel {
         setIsRepoOpen(true);
         setSelectedCommit(null);
         setSearchQuery("");
-        await loadCommitGraph();
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
         alert(`Failed to open repository: ${errorMessage}\n\nPath: ${path}`);
       }
     },
-    [loadCommitGraph]
+    []
   );
 
   const closeRepository = useCallback(() => {
