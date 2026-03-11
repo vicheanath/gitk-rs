@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { GitCommitHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, X } from "lucide-react";
+import {
+  FolderGit2,
+  GitCommitHorizontal,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Settings2,
+  X,
+} from "lucide-react";
 import { useAppContext } from "./context/AppContext";
 import CommitGraphList from "./components/CommitGraphList/CommitGraphList";
 import CommitDetails from "./components/CommitDetails/CommitDetails";
@@ -149,20 +156,28 @@ function App() {
   return (
     <div className="app gitk-layout">
       <div className="app-titlebar">
-        <div className="app-title">
-          <span className="app-title-text">GitK-RS</span>
+        <div className="app-titlebar-left">
+          <div className="app-product-pill" aria-label="GitK-RS">
+            <FolderGit2 size={14} />
+            <span className="app-title-text">GitK-RS</span>
+          </div>
           {isRepoOpen && (
-            <span className="app-repo-name">
-              {repoPath?.split("/").pop() || "Repository"}
-            </span>
+            <div className="app-title-breadcrumbs">
+              <span className="app-title-crumb-label">Repository</span>
+              <span className="app-repo-name">
+                {repoPath?.split("/").pop() || "Repository"}
+              </span>
+            </div>
           )}
         </div>
         {isRepoOpen && (
-          <div className="titlebar-search">
-            <SearchBar ref={searchBarRef} onSearch={setSearchQuery} />
+          <div className="app-titlebar-center">
+            <div className="titlebar-search">
+              <SearchBar ref={searchBarRef} onSearch={setSearchQuery} />
+            </div>
           </div>
         )}
-        <div className="app-title-actions">
+        <div className="app-title-actions" role="toolbar" aria-label="Window actions">
           {isRepoOpen && (
             <button
               className="sidebar-toggle-btn"

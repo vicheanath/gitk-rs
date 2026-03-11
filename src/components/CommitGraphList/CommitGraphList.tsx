@@ -95,6 +95,7 @@ export default function CommitGraphList({
         {/* Graph lane + node SVG (left column) */}
         <GraphPane
           filteredNodes={filteredNodes}
+          layoutCommits={layout.layoutCommits}
           positions={positions}
           edges={edges}
           branchColors={branchColors}

@@ -1,5 +1,5 @@
 import { CommitNode, GraphEdge } from "../../types/git";
-import { NodePosition } from "../../utils/layout/gitkLayout";
+import { LayoutCommit, NodePosition } from "../../utils/layout/gitkLayout";
 import { getNodeColor } from "../../utils/graph/branchColors";
 import { ROW_HEIGHT } from "./constants";
 
@@ -39,6 +39,7 @@ function buildConnectionPath(
 
 interface GraphPaneProps {
   filteredNodes: CommitNode[];
+  layoutCommits: LayoutCommit[];
   positions: Map<string, NodePosition>;
   edges: GraphEdge[];
   branchColors: Map<string, string>;
@@ -52,6 +53,7 @@ interface GraphPaneProps {
 
 export default function GraphPane({
   filteredNodes,
+  layoutCommits,
   positions,
   edges,
   branchColors,
@@ -71,6 +73,7 @@ export default function GraphPane({
 
   const nodeToRowIndex = new Map<string, number>();
   filteredNodes.forEach((node, idx) => nodeToRowIndex.set(node.id, idx));
+  const layoutByHash = new Map(layoutCommits.map((entry) => [entry.hash, entry]));
 
   const laneRows = new Map<number, { x: number; color: string; rows: number[] }>();
   filteredNodes.forEach((node, rowIndex) => {
@@ -89,27 +92,61 @@ export default function GraphPane({
     laneData.rows.push(rowIndex);
   });
 
-  const horizontalConnections = edges
-    .map((edge) => {
-      const fromPos = positions.get(edge.from);
-      const toPos = positions.get(edge.to);
-      const fromRow = nodeToRowIndex.get(edge.from);
-      const toRow = nodeToRowIndex.get(edge.to);
-      if (!fromPos || !toPos || fromRow === undefined || toRow === undefined) {
-        return null;
-      }
-      if (fromPos.lane === toPos.lane) return null;
+  const horizontalConnectionsFromLayout = filteredNodes
+    .flatMap((node) => {
+      const entry = layoutByHash.get(node.id);
+      if (!entry) return [];
 
-      return {
-        key: `${edge.from}-${edge.to}`,
-        fromX: fromPos.x,
-        toX: toPos.x,
-        fromY: Math.round(fromRow * ROW_HEIGHT + ROW_HEIGHT / 2),
-        toY: Math.round(toRow * ROW_HEIGHT + ROW_HEIGHT / 2),
-        color: getNodeColor(edge.from, branchColors),
-      };
-    })
-    .filter((c): c is NonNullable<typeof c> => c !== null);
+      const fromPos = positions.get(node.id);
+      const fromRow = nodeToRowIndex.get(node.id);
+      if (!fromPos || fromRow === undefined) return [];
+
+      return entry.parents
+        .map((parentHash, idx) => {
+          const toPos = positions.get(parentHash);
+          const toRow = nodeToRowIndex.get(parentHash);
+          const parentColumn = entry.parentColumns[idx];
+          if (!toPos || toRow === undefined || parentColumn < 0) {
+            return null;
+          }
+          if (fromPos.lane === parentColumn) return null;
+
+          return {
+            key: `${node.id}-${parentHash}`,
+            fromX: fromPos.x,
+            toX: toPos.x,
+            fromY: Math.round(fromRow * ROW_HEIGHT + ROW_HEIGHT / 2),
+            toY: Math.round(toRow * ROW_HEIGHT + ROW_HEIGHT / 2),
+            color: getNodeColor(node.id, branchColors),
+          };
+        })
+        .filter((conn): conn is NonNullable<typeof conn> => conn !== null);
+    });
+
+  const horizontalConnections =
+    horizontalConnectionsFromLayout.length > 0
+      ? horizontalConnectionsFromLayout
+      : edges
+          .map((edge) => {
+            const fromPos = positions.get(edge.from);
+            const toPos = positions.get(edge.to);
+            const fromRow = nodeToRowIndex.get(edge.from);
+            const toRow = nodeToRowIndex.get(edge.to);
+            if (!fromPos || !toPos || fromRow === undefined || toRow === undefined) {
+              return null;
+            }
+            if (fromPos.lane === toPos.lane) return null;
+
+            return {
+              key: `${edge.from}-${edge.to}`,
+              fromX: fromPos.x,
+              toX: toPos.x,
+              fromY: Math.round(fromRow * ROW_HEIGHT + ROW_HEIGHT / 2),
+              toY: Math.round(toRow * ROW_HEIGHT + ROW_HEIGHT / 2),
+              color: getNodeColor(edge.from, branchColors),
+            };
+          })
+          .filter((c): c is NonNullable<typeof c> => c !== null);
 
   // Center the SVG horizontally if it's smaller than the available width
   const svgOffset = Math.max(0, (graphWidth - svgWidth) / 2);

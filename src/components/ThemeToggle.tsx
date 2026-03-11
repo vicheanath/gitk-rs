@@ -3,9 +3,10 @@ import { Moon, Sun } from "lucide-react";
 
 export default function ThemeToggle() {
   const { settings, updateSettings } = useSettings();
+  const isLightMode = settings.theme === "light" || settings.theme === "solarized-light" || settings.theme === "high-contrast-light";
 
   const toggleTheme = () => {
-    const newTheme = settings.theme === "light" ? "dark" : "light";
+    const newTheme = isLightMode ? "dark" : "light";
     updateSettings({ theme: newTheme });
   };
 
@@ -13,9 +14,9 @@ export default function ThemeToggle() {
     <button
       className="theme-toggle"
       onClick={toggleTheme}
-      title={`Switch to ${settings.theme === "light" ? "dark" : "light"} theme`}
+      title={`Switch to ${isLightMode ? "dark" : "light"} theme`}
     >
-      {settings.theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+      {isLightMode ? <Moon size={16} /> : <Sun size={16} />}
     </button>
   );
 }

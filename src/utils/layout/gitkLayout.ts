@@ -1,5 +1,20 @@
 import { CommitNode, GraphEdge } from "../../types/git";
 
+export interface Commit {
+  hash: string;
+  parents: string[];
+  date: string;
+  message?: string;
+}
+
+export interface LayoutCommit {
+  hash: string;
+  row: number;
+  column: number;
+  parents: string[];
+  parentColumns: number[];
+}
+
 export interface NodePosition {
   x: number;
   y: number;
@@ -10,78 +25,148 @@ export interface NodePosition {
 export interface GraphLayout {
   positions: Map<string, NodePosition>;
   sortedNodes: CommitNode[]; // Sorted nodes in the same order as graph rows
+  layoutCommits: LayoutCommit[];
   width: number;
   height: number;
 }
 
-const ROW_HEIGHT = 24; // Height of each commit row (matches table row height)
-const LANE_WIDTH = 18; // Width between branch lanes (GitK style - compact)
+const ROW_HEIGHT = 40;
+const COLUMN_WIDTH = 24;
 const GRAPH_LEFT_PADDING = 8;
 const GRAPH_RIGHT_PADDING = 8;
 
-/**
- * TOPOLOGICAL SORT ALGORITHM
- *
- * Produces a display-order list of commits matching `git log --graph`:
- *   - Topological order: every child appears before its parents
- *   - First-parent preference: main line stays on the left
- *
- * Algorithm (Kahn's algorithm with first-parent priority):
- * 1. Count in-degree for each commit (how many children it has)
- * 2. Seed queue with commits that have no children (branch tips, HEAD)
- * 3. While queue is not empty:
- *    - Pop a commit and add to result
- *    - For each parent, decrement in-degree
- *    - If first-parent reaches zero in-degree, push to front of queue (keeps main line contiguous)
- *    - Otherwise push to back of queue (other parents processed after)
- *
- * This ensures the first-parent chain (main branch) stays on the left.
- */
-function topoSort(nodes: CommitNode[], nodeSet: Set<string>): CommitNode[] {
-  const inDegree = new Map<string, number>();
-  const nodeById = new Map<string, CommitNode>(nodes.map((n) => [n.id, n]));
+interface InternalCommit {
+  hash: string;
+  parents: string[];
+  time: number;
+  node?: CommitNode;
+}
 
-  // Count in-degree for each commit
-  for (const node of nodes) {
-    if (!inDegree.has(node.id)) inDegree.set(node.id, 0);
-    for (const pid of node.parents) {
-      if (!nodeSet.has(pid)) continue;
-      inDegree.set(pid, (inDegree.get(pid) ?? 0) + 1);
+class MaxHeap<T> {
+  private data: T[] = [];
+  private readonly compare: (a: T, b: T) => number;
+
+  constructor(compare: (a: T, b: T) => number) {
+    this.compare = compare;
+  }
+
+  get size(): number {
+    return this.data.length;
+  }
+
+  push(value: T) {
+    this.data.push(value);
+    this.bubbleUp(this.data.length - 1);
+  }
+
+  pop(): T | undefined {
+    if (this.data.length === 0) return undefined;
+    const top = this.data[0];
+    const last = this.data.pop()!;
+    if (this.data.length > 0) {
+      this.data[0] = last;
+      this.bubbleDown(0);
+    }
+    return top;
+  }
+
+  private bubbleUp(index: number) {
+    let i = index;
+    while (i > 0) {
+      const parent = Math.floor((i - 1) / 2);
+      if (this.compare(this.data[i], this.data[parent]) <= 0) break;
+      [this.data[i], this.data[parent]] = [this.data[parent], this.data[i]];
+      i = parent;
     }
   }
 
-  // Seed queue with tips (commits with no children)
-  const queue: CommitNode[] = nodes.filter((n) => (inDegree.get(n.id) ?? 0) === 0);
-  const result: CommitNode[] = [];
+  private bubbleDown(index: number) {
+    let i = index;
+    const n = this.data.length;
+    while (true) {
+      const left = 2 * i + 1;
+      const right = left + 1;
+      let best = i;
 
-  while (queue.length > 0) {
-    const node = queue.shift()!;
-    result.push(node);
+      if (left < n && this.compare(this.data[left], this.data[best]) > 0) {
+        best = left;
+      }
+      if (right < n && this.compare(this.data[right], this.data[best]) > 0) {
+        best = right;
+      }
+      if (best === i) break;
 
-    // Process parents in order to maintain first-parent preference
-    for (const pid of node.parents) {
+      [this.data[i], this.data[best]] = [this.data[best], this.data[i]];
+      i = best;
+    }
+  }
+}
+
+/**
+ * Topological sort with git-log-like tie breaking.
+ *
+ * Guarantees child-before-parent ordering and prefers continuing through
+ * the first parent when possible, while otherwise selecting the newest
+ * available tip to keep the output close to `git log --graph --oneline`.
+ */
+function topoSort(commits: InternalCommit[], nodeSet: Set<string>): InternalCommit[] {
+  const commitByHash = new Map<string, InternalCommit>(commits.map((c) => [c.hash, c]));
+  const childCount = new Map<string, number>();
+  const inputOrder = new Map<string, number>(commits.map((c, i) => [c.hash, i]));
+
+  for (const commit of commits) {
+    if (!childCount.has(commit.hash)) childCount.set(commit.hash, 0);
+    for (const pid of commit.parents) {
       if (!nodeSet.has(pid)) continue;
-      const deg = (inDegree.get(pid) ?? 1) - 1;
-      inDegree.set(pid, deg);
-      if (deg === 0) {
-        const parent = nodeById.get(pid)!;
-        // First parent goes to front (keeps main line contiguous)
-        // Other parents go to back (processed later)
-        if (node.parents[0] === pid) {
-          queue.unshift(parent);
-        } else {
-          queue.push(parent);
-        }
+      childCount.set(pid, (childCount.get(pid) ?? 0) + 1);
+    }
+  }
+
+  const ready = new MaxHeap<string>((a, b) => {
+    const ca = commitByHash.get(a)!;
+    const cb = commitByHash.get(b)!;
+    if (ca.time !== cb.time) return ca.time - cb.time;
+    return (inputOrder.get(b) ?? 0) - (inputOrder.get(a) ?? 0);
+  });
+
+  commits.forEach((c) => {
+    if ((childCount.get(c.hash) ?? 0) === 0) {
+      ready.push(c.hash);
+    }
+  });
+
+  const result: InternalCommit[] = [];
+  const emitted = new Set<string>();
+
+  while (ready.size > 0) {
+    const nextHash = ready.pop()!;
+    if (emitted.has(nextHash)) continue;
+
+    const commit = commitByHash.get(nextHash);
+    if (!commit) continue;
+
+    emitted.add(nextHash);
+    result.push(commit);
+
+    for (const pid of commit.parents) {
+      if (!nodeSet.has(pid)) continue;
+
+      const nextCount = (childCount.get(pid) ?? 1) - 1;
+      childCount.set(pid, nextCount);
+      if (nextCount === 0) {
+        ready.push(pid);
       }
     }
   }
 
-  // Add any disconnected commits (shouldn't happen in normal git history)
-  if (result.length < nodes.length) {
-    const seen = new Set(result.map((n) => n.id));
-    for (const node of nodes) {
-      if (!seen.has(node.id)) result.push(node);
-    }
+  if (result.length < commits.length) {
+    const leftovers = commits
+      .filter((c) => !emitted.has(c.hash))
+      .sort((a, b) => {
+        if (a.time !== b.time) return b.time - a.time;
+        return (inputOrder.get(a.hash) ?? 0) - (inputOrder.get(b.hash) ?? 0);
+      });
+    result.push(...leftovers);
   }
 
   return result;
@@ -160,72 +245,110 @@ function topoSort(nodes: CommitNode[], nodeSet: Set<string>): CommitNode[] {
  * RESULT LANES:
  *   D=0, C=0, F=1, E=1, B=0, A=0
  */
-function assignLanes(sortedNodes: CommitNode[], nodeSet: Set<string>): Map<string, number> {
-  const laneMap = new Map<string, number>();
-  const active: (string | null)[] = [];
+function layoutInternal(sortedCommits: InternalCommit[]): LayoutCommit[] {
+  const allHashes = new Set(sortedCommits.map((c) => c.hash));
+  const remaining = new Set(allHashes);
+  let activeColumns: (string | null)[] = [];
 
-  for (const node of sortedNodes) {
-    const nodeParents = node.parents.filter((p) => nodeSet.has(p));
+  const rebuildColumnIndex = (columns: (string | null)[]) => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < columns.length; i++) {
+      const hash = columns[i];
+      if (hash && !map.has(hash)) map.set(hash, i);
+    }
+    return map;
+  };
 
-    // ─────────────────────────────────────────────────────────────────
-    // STEP 1: FIND OR CREATE COLUMN FOR THIS COMMIT
-    // ─────────────────────────────────────────────────────────────────
-    let col = active.indexOf(node.id);
-    if (col === -1) {
-      // Commit not waiting in any column → new branch tip
-      // Find first free slot or extend
-      const free = active.indexOf(null);
-      col = free !== -1 ? free : active.length;
-      active[col] = node.id;
+  const layout: LayoutCommit[] = [];
+
+  for (let row = 0; row < sortedCommits.length; row++) {
+    const commit = sortedCommits[row];
+    remaining.delete(commit.hash);
+
+    let columnIndexByHash = rebuildColumnIndex(activeColumns);
+    let column = columnIndexByHash.get(commit.hash);
+
+    // STEP 1: Find existing column for this commit or create a new active column.
+    if (column === undefined) {
+      column = activeColumns.length;
+      activeColumns.push(commit.hash);
+      columnIndexByHash.set(commit.hash, column);
     }
 
-    laneMap.set(node.id, col);
+    const parents = commit.parents.filter((p) => allHashes.has(p));
 
-    // ─────────────────────────────────────────────────────────────────
-    // STEP 2: UPDATE ACTIVE COLUMNS FOR PARENTS
-    // ─────────────────────────────────────────────────────────────────
-    if (nodeParents.length === 0) {
-      // Root commit: free the column
-      active[col] = null;
+    // STEP 3: Update active columns according to parent relationship rules.
+    if (parents.length === 0) {
+      activeColumns[column] = null;
     } else {
-      const firstParent = nodeParents[0];
+      const firstParent = parents[0];
+      const firstParentCol = columnIndexByHash.get(firstParent);
 
-      // Check if first parent is already waiting in another column
-      const alreadyTracked = active.findIndex((a, i) => a === firstParent && i !== col);
-
-      if (alreadyTracked !== -1) {
-        // First parent already tracked elsewhere (branches converging)
-        // Free this column since the merge point has it covered
-        active[col] = null;
+      if (firstParentCol !== undefined && firstParentCol !== column) {
+        activeColumns[column] = null;
       } else {
-        // First parent not tracked: assign to current column (main line continues)
-        active[col] = firstParent;
+        activeColumns[column] = firstParent;
       }
 
-      // For merge commits: add columns for additional parents
-      for (let i = 1; i < nodeParents.length; i++) {
-        const parent = nodeParents[i];
-        if (active.includes(parent)) continue; // Already tracked elsewhere
+      let insertOffset = 1;
+      for (let i = 1; i < parents.length; i++) {
+        const parent = parents[i];
+        columnIndexByHash = rebuildColumnIndex(activeColumns);
+        if (columnIndexByHash.has(parent)) continue;
 
-        // Find free slot after current column (branches extend to the right)
-        const free = active.indexOf(null, col + 1);
-        if (free !== -1) {
-          active[free] = parent;
-        } else {
-          active.push(parent);
-        }
+        const insertAt = Math.min(column + insertOffset, activeColumns.length);
+        activeColumns.splice(insertAt, 0, parent);
+        insertOffset += 1;
       }
     }
 
-    // ─────────────────────────────────────────────────────────────────
-    // STEP 3: COMPACT TRAILING NULLS
-    // ─────────────────────────────────────────────────────────────────
-    while (active.length > 0 && active[active.length - 1] === null) {
-      active.pop();
+    // STEP 4: Remove dead branch columns that will not appear later.
+    for (let i = 0; i < activeColumns.length; i++) {
+      const hash = activeColumns[i];
+      if (hash && !remaining.has(hash)) {
+        activeColumns[i] = null;
+      }
     }
+
+    // Compact interior and trailing holes so columns are aggressively reused.
+    activeColumns = activeColumns.filter((value) => value !== null);
+
+    layout.push({
+      hash: commit.hash,
+      row,
+      column,
+      parents,
+      parentColumns: [],
+    });
   }
 
-  return laneMap;
+  const rowByHash = new Map(layout.map((l) => [l.hash, l]));
+  for (const entry of layout) {
+    entry.parentColumns = entry.parents.map((parentHash) => {
+      const parent = rowByHash.get(parentHash);
+      return parent ? parent.column : -1;
+    });
+  }
+
+  return layout;
+}
+
+/**
+ * Public layout API for graph rendering.
+ *
+ * Commits are first topologically ordered with date-priority tie-breaking,
+ * then assigned active columns with merge-aware collapse/reuse.
+ */
+export function layoutCommits(commits: Commit[]): LayoutCommit[] {
+  const internal: InternalCommit[] = commits.map((c, index) => ({
+    hash: c.hash,
+    parents: [...c.parents],
+    time: Number.isNaN(Date.parse(c.date)) ? -index : Date.parse(c.date),
+  }));
+
+  const nodeSet = new Set(internal.map((c) => c.hash));
+  const sorted = topoSort(internal, nodeSet);
+  return layoutInternal(sorted);
 }
 
 export function computeGitKLayout(
@@ -234,41 +357,47 @@ export function computeGitKLayout(
   maxCommits: number = 1000
 ): GraphLayout {
   if (nodes.length === 0) {
-    return { positions: new Map(), sortedNodes: [], width: 0, height: 0 };
+    return { positions: new Map(), sortedNodes: [], layoutCommits: [], width: 0, height: 0 };
   }
 
-  // 1. Pre-sort by time (newest first) for stable topological sort
-  const limitedNodes = [...nodes]
+  const internal: InternalCommit[] = nodes
+    .map((node, index) => ({
+      hash: node.id,
+      parents: node.parents,
+      time: node.time,
+      node,
+      // Keep consistent fallback ordering for equal timestamps.
+      _index: index,
+    }))
+    // Stable order for tie-breaking before topological sorting.
     .sort((a, b) => b.time - a.time)
-    .slice(0, maxCommits);
+    .map(({ hash, parents, time, node }) => ({ hash, parents, time, node }));
 
-  const nodeSet = new Set(limitedNodes.map((n) => n.id));
-
-  // 2. Topological sort: children before parents, first-parent preference
-  const sortedNodes = topoSort(limitedNodes, nodeSet);
-
-  // 3. Lane assignment using git log --graph algorithm
-  const laneAssignment = assignLanes(sortedNodes, nodeSet);
+  const nodeSet = new Set(internal.map((c) => c.hash));
+  const topo = topoSort(internal, nodeSet);
+  const limited = topo.slice(0, maxCommits);
+  const sortedNodes = limited.map((c) => c.node!).filter((n): n is CommitNode => Boolean(n));
+  const layoutCommits = layoutInternal(limited);
 
   // 4. Convert lanes to pixel positions
   const positions = new Map<string, NodePosition>();
   let maxLane = 0;
 
-  sortedNodes.forEach((node, rowIndex) => {
-    const lane = laneAssignment.get(node.id) ?? 0;
-    maxLane = Math.max(maxLane, lane);
-    positions.set(node.id, {
-      x: GRAPH_LEFT_PADDING + lane * LANE_WIDTH,
-      y: rowIndex * ROW_HEIGHT + ROW_HEIGHT / 2,
-      lane,
-      row: rowIndex,
+  layoutCommits.forEach((entry) => {
+    maxLane = Math.max(maxLane, entry.column);
+    positions.set(entry.hash, {
+      x: GRAPH_LEFT_PADDING + entry.column * COLUMN_WIDTH,
+      y: entry.row * ROW_HEIGHT + ROW_HEIGHT / 2,
+      lane: entry.column,
+      row: entry.row,
     });
   });
 
   return {
     positions,
     sortedNodes,
-    width: GRAPH_LEFT_PADDING + (maxLane + 1) * LANE_WIDTH + GRAPH_RIGHT_PADDING,
+    layoutCommits,
+    width: GRAPH_LEFT_PADDING + (maxLane + 1) * COLUMN_WIDTH + GRAPH_RIGHT_PADDING,
     height: sortedNodes.length * ROW_HEIGHT,
   };
 }

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CommitNode, GraphEdge, Branch } from "../types/git";
-import { computeGitKLayout, NodePosition } from "../utils/layout/gitkLayout";
+import {
+  computeGitKLayout,
+  LayoutCommit,
+  NodePosition,
+} from "../utils/layout/gitkLayout";
 import { assignBranchColors } from "../utils/graph/branchColors";
 import { HEADER_HEIGHT, ROW_HEIGHT } from "../components/CommitGraphList/constants";
 
@@ -21,6 +25,7 @@ export function useCommitGraphListViewModel({
   const [layout, setLayout] = useState<{
     positions: Map<string, NodePosition>;
     sortedNodes: CommitNode[];
+    layoutCommits: LayoutCommit[];
     width: number;
     height: number;
   } | null>(null);

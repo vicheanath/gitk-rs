@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useSettings } from "../../context/SettingsContext";
-import { AppSettings } from "../../types/settings";
+import { AppSettings, DEFAULT_SETTINGS, THEME_OPTIONS } from "../../types/settings";
 import { X } from "lucide-react";
 
 interface SettingsDialogProps {
@@ -42,30 +42,56 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
     <div className="settings-overlay" onMouseDown={handleBackdropClick}>
       <div className="settings-dialog" ref={dialogRef}>
         <div className="settings-header">
-          <span className="settings-title">Settings</span>
+          <div className="settings-title-wrap">
+            <span className="settings-title">Settings</span>
+            <span className="settings-subtitle">Personalize appearance and repository behavior</span>
+          </div>
           <button className="settings-close" onClick={onClose} title="Close">
             <X size={15} />
           </button>
         </div>
 
         <div className="settings-body">
+          <div className="settings-layout">
           {/* Appearance */}
-          <section className="settings-section">
+          <section className="settings-section settings-section-appearance">
             <h3 className="settings-section-title">Appearance</h3>
 
             <div className="settings-row">
-              <label className="settings-label">Theme</label>
-              <div className="settings-control">
-                <select
-                  className="settings-select"
-                  value={settings.theme}
-                  onChange={(e) =>
-                    field("theme", e.target.value as AppSettings["theme"])
-                  }
-                >
-                  <option value="dark">Dark</option>
-                  <option value="light">Light</option>
-                </select>
+              <label className="settings-label settings-label-stack">
+                <span>Theme</span>
+                <span className="settings-hint">Choose from 10 built-in themes</span>
+              </label>
+              <div className="settings-control settings-control-grow">
+                <div className="settings-theme-grid" role="radiogroup" aria-label="Theme selection">
+                  {THEME_OPTIONS.map((theme) => {
+                    const selected = settings.theme === theme.value;
+                    return (
+                      <button
+                        key={theme.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        className={`settings-theme-card${selected ? " selected" : ""}`}
+                        onClick={() => field("theme", theme.value)}
+                        title={theme.description}
+                      >
+                        <span
+                          className="settings-theme-swatch"
+                          data-theme-preview={theme.value}
+                          aria-hidden="true"
+                        />
+                        <span className="settings-theme-meta">
+                          <span className="settings-theme-name">{theme.label}</span>
+                          <span className="settings-theme-description">{theme.description}</span>
+                        </span>
+                        {theme.highContrast ? (
+                          <span className="settings-theme-badge">HC</span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -109,9 +135,8 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             </div>
           </section>
 
-          {/* Diff / Patch */}
-          <section className="settings-section">
-            <h3 className="settings-section-title">Diff / Patch</h3>
+          <section className="settings-section settings-section-workspace">
+            <h3 className="settings-section-title">Workspace</h3>
 
             <div className="settings-row">
               <label className="settings-label">Context lines</label>
@@ -144,11 +169,6 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                 </label>
               </div>
             </div>
-          </section>
-
-          {/* Performance */}
-          <section className="settings-section">
-            <h3 className="settings-section-title">Performance</h3>
 
             <div className="settings-row">
               <label className="settings-label">Max commits to load</label>
@@ -174,13 +194,19 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
               </div>
             </div>
           </section>
+          </div>
         </div>
 
         <div className="settings-footer">
           <span className="settings-saved-label">Changes save automatically</span>
-          <button className="settings-done-btn" onClick={onClose}>
-            Done
-          </button>
+          <div className="settings-footer-actions">
+            <button className="settings-reset-btn" onClick={() => updateSettings(DEFAULT_SETTINGS)}>
+              Reset
+            </button>
+            <button className="settings-done-btn" onClick={onClose}>
+              Done
+            </button>
+          </div>
         </div>
       </div>
     </div>
