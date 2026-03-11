@@ -8,6 +8,7 @@ import {
   Folder,
   GitCommitHorizontal,
   List,
+  Minus,
   RefreshCw,
   RotateCcw,
   Waypoints,
@@ -16,6 +17,12 @@ import { WorkingTreeFile } from "../../types/git";
 import { useAppContext } from "../../context/AppContext";
 
 type ViewMode = "tree" | "list";
+type SectionKind = "staged" | "unstaged";
+
+interface SelectedChange {
+  path: string;
+  section: SectionKind;
+}
 
 type ChangeNode =
   | { type: "folder"; name: string; path: string; children: ChangeNode[] }
@@ -86,8 +93,12 @@ function collectFolderPaths(nodes: ChangeNode[], acc = new Set<string>()): Set<s
   return acc;
 }
 
-function formatStatus(file: WorkingTreeFile): string {
-  const status = file.staged ? file.staged_status : file.unstaged_status;
+function getStatusForSection(file: WorkingTreeFile, section: SectionKind) {
+  return section === "staged" ? file.staged_status : file.unstaged_status;
+}
+
+function formatStatus(file: WorkingTreeFile, section: SectionKind): string {
+  const status = getStatusForSection(file, section);
   if (file.conflicted) return "C";
   switch (status) {
     case "added":
@@ -106,13 +117,23 @@ function formatStatus(file: WorkingTreeFile): string {
   }
 }
 
-function statusTone(file: WorkingTreeFile): string {
+function statusTone(file: WorkingTreeFile, section: SectionKind): string {
   if (file.conflicted) return "conflict";
-  const status = file.staged ? file.staged_status : file.unstaged_status;
+  const status = getStatusForSection(file, section);
   if (status === "deleted") return "deleted";
   if (status === "modified") return "modified";
   if (status === "renamed" || status === "typechange") return "renamed";
   return "added";
+}
+
+function classifyDiffLine(line: string): string {
+  if (line.startsWith("diff --git")) return "line-kind-diff-file-header";
+  if (line.startsWith("index ")) return "line-kind-diff-index";
+  if (line.startsWith("@@")) return "line-kind-diff-hunk";
+  if (line.startsWith("---") || line.startsWith("+++")) return "line-kind-diff-meta";
+  if (line.startsWith("+") && !line.startsWith("+++")) return "diff-add";
+  if (line.startsWith("-") && !line.startsWith("---")) return "diff-remove";
+  return "";
 }
 
 export default function ChangesPanel() {
@@ -120,6 +141,14 @@ export default function ChangesPanel() {
   const [files, setFiles] = useState<WorkingTreeFile[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>("tree");
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Record<SectionKind, boolean>>({
+    staged: true,
+    unstaged: true,
+  });
+  const [selectedChange, setSelectedChange] = useState<SelectedChange | null>(null);
+  const [diffText, setDiffText] = useState("");
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [diffError, setDiffError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -150,6 +179,31 @@ export default function ChangesPanel() {
   const unstagedTree = useMemo(() => buildTree(unstagedFiles), [unstagedFiles]);
 
   useEffect(() => {
+    setSelectedChange((current) => {
+      if (
+        current &&
+        files.some(
+          (file) =>
+            file.path === current.path &&
+            (current.section === "staged" ? file.staged : file.unstaged || (!file.staged && !file.unstaged))
+        )
+      ) {
+        return current;
+      }
+
+      if (unstagedFiles.length > 0) {
+        return { path: unstagedFiles[0].path, section: "unstaged" };
+      }
+
+      if (stagedFiles.length > 0) {
+        return { path: stagedFiles[0].path, section: "staged" };
+      }
+
+      return null;
+    });
+  }, [files, stagedFiles, unstagedFiles]);
+
+  useEffect(() => {
     const nextPaths = collectFolderPaths(unstagedTree);
     setExpandedFolders((prev) => {
       if (prev.size === 0) return nextPaths;
@@ -160,6 +214,48 @@ export default function ChangesPanel() {
       return next.size === 0 ? nextPaths : next;
     });
   }, [unstagedTree]);
+
+  useEffect(() => {
+    if (!selectedChange) {
+      setDiffText("");
+      setDiffError(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDiff = async () => {
+      setDiffLoading(true);
+      setDiffError(null);
+      try {
+        const result = await invoke<string>("get_working_tree_diff", {
+          path: selectedChange.path,
+          staged: selectedChange.section === "staged",
+          contextLines: 3,
+          ignoreWhitespace: false,
+        });
+
+        if (!cancelled) {
+          setDiffText(result);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setDiffError(String(err));
+          setDiffText("");
+        }
+      } finally {
+        if (!cancelled) {
+          setDiffLoading(false);
+        }
+      }
+    };
+
+    void loadDiff();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedChange]);
 
   const refreshAll = async () => {
     await loadStatus();
@@ -177,6 +273,13 @@ export default function ChangesPanel() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const toggleSection = (section: SectionKind) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
   };
 
   const handleCommit = async () => {
@@ -210,21 +313,29 @@ export default function ChangesPanel() {
     });
   };
 
-  const renderFileRow = (file: WorkingTreeFile, compactPath = false, level = 0) => {
-    const tone = statusTone(file);
+  const renderFileRow = (
+    file: WorkingTreeFile,
+    section: SectionKind,
+    compactPath = false,
+    level = 0
+  ) => {
+    const tone = statusTone(file, section);
     const fileName = file.path.split("/").pop() ?? file.path;
     const pathSuffix = compactPath
       ? file.path.split("/").slice(0, -1).join("/")
       : file.path;
+    const selected =
+      selectedChange?.path === file.path && selectedChange.section === section;
 
     return (
       <li
-        key={file.path}
-        className="changes-row changes-row-file"
+        key={`${section}:${file.path}`}
+        className={`changes-row changes-row-file ${selected ? "selected" : ""}`.trim()}
         style={compactPath ? { paddingLeft: `${level * 14 + 8}px` } : undefined}
+        onClick={() => setSelectedChange({ path: file.path, section })}
       >
         <div className="changes-row-main">
-          <span className={`changes-status-mark ${tone}`}>{formatStatus(file)}</span>
+          <span className={`changes-status-mark ${tone}`}>{formatStatus(file, section)}</span>
           <span className="changes-file-icon"><FileCode2 size={12} /></span>
           <div className="changes-file-text">
             <span className="changes-file-name" title={file.path}>{compactPath ? fileName : file.path}</span>
@@ -234,24 +345,47 @@ export default function ChangesPanel() {
           </div>
         </div>
         <div className="changes-row-actions">
-          <button
-            type="button"
-            className="changes-icon-btn"
-            onClick={() => void runAction(() => invoke("discard_paths", { paths: [file.path] }))}
-            disabled={busy}
-            title="Discard changes"
-          >
-            <RotateCcw size={12} />
-          </button>
-          <button
-            type="button"
-            className="changes-icon-btn"
-            onClick={() => void runAction(() => invoke("stage_paths", { paths: [file.path] }))}
-            disabled={busy}
-            title="Stage changes"
-          >
-            <Check size={12} />
-          </button>
+          {section === "staged" ? (
+            <button
+              type="button"
+              className="changes-icon-btn"
+              onClick={(event) => {
+                event.stopPropagation();
+                void runAction(() => invoke("unstage_paths", { paths: [file.path] }));
+              }}
+              disabled={busy}
+              title="Unstage changes"
+            >
+              <Minus size={12} />
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="changes-icon-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void runAction(() => invoke("discard_paths", { paths: [file.path] }));
+                }}
+                disabled={busy}
+                title="Discard changes"
+              >
+                <RotateCcw size={12} />
+              </button>
+              <button
+                type="button"
+                className="changes-icon-btn"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void runAction(() => invoke("stage_paths", { paths: [file.path] }));
+                }}
+                disabled={busy}
+                title="Stage changes"
+              >
+                <Check size={12} />
+              </button>
+            </>
+          )}
         </div>
       </li>
     );
@@ -259,7 +393,7 @@ export default function ChangesPanel() {
 
   const renderTreeNode = (node: ChangeNode, level = 0): JSX.Element => {
     if (node.type === "file") {
-      return renderFileRow(node.file, true, level);
+      return renderFileRow(node.file, "unstaged", true, level);
     }
 
     const expanded = expandedFolders.has(node.path);
@@ -315,25 +449,7 @@ export default function ChangesPanel() {
           <button
             type="button"
             className="changes-icon-btn"
-            onClick={() => void runAction(() => invoke("stage_all"))}
-            disabled={busy || unstagedFiles.length === 0}
-            title="Stage all"
-          >
-            <Check size={12} />
-          </button>
-          <button
-            type="button"
-            className="changes-icon-btn"
-            onClick={() => void runAction(() => invoke("discard_all"))}
-            disabled={busy || unstagedFiles.length === 0}
-            title="Discard all"
-          >
-            <RotateCcw size={12} />
-          </button>
-          <button
-            type="button"
-            className="changes-icon-btn"
-            onClick={() => void loadStatus()}
+            onClick={() => void refreshAll()}
             disabled={busy}
             title="Refresh"
           >
@@ -370,32 +486,70 @@ export default function ChangesPanel() {
       ) : (
         <>
           <section className="changes-section compact">
-            <div className="changes-section-title">Staged</div>
-            {stagedFiles.length === 0 ? (
+            <div className="changes-section-header">
+              <button
+                type="button"
+                className="changes-section-toggle"
+                onClick={() => toggleSection("staged")}
+              >
+                {expandedSections.staged ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                <span className="changes-section-title">Staged Changes</span>
+                <span className="changes-count">{stagedFiles.length}</span>
+              </button>
+              <div className="changes-section-actions">
+                <button
+                  type="button"
+                  className="changes-icon-btn"
+                  onClick={() => void runAction(() => invoke("unstage_all"))}
+                  disabled={busy || stagedFiles.length === 0}
+                  title="Unstage all"
+                >
+                  <Minus size={12} />
+                </button>
+              </div>
+            </div>
+            {!expandedSections.staged ? null : stagedFiles.length === 0 ? (
               <div className="changes-empty">No staged files</div>
             ) : (
               <ul className="changes-list compact">
-                {stagedFiles.map((file) => {
-                  const tone = statusTone(file);
-                  return (
-                    <li key={`staged:${file.path}`} className="changes-row changes-row-file staged">
-                      <div className="changes-row-main">
-                        <span className={`changes-status-mark ${tone}`}>{formatStatus(file)}</span>
-                        <span className="changes-file-icon"><FileCode2 size={12} /></span>
-                        <div className="changes-file-text">
-                          <span className="changes-file-name" title={file.path}>{file.path}</span>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
+                {stagedFiles.map((file) => renderFileRow(file, "staged", false))}
               </ul>
             )}
           </section>
 
           <section className="changes-section compact">
-            <div className="changes-section-title">Changes</div>
-            {unstagedFiles.length === 0 ? (
+            <div className="changes-section-header">
+              <button
+                type="button"
+                className="changes-section-toggle"
+                onClick={() => toggleSection("unstaged")}
+              >
+                {expandedSections.unstaged ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                <span className="changes-section-title">Changes</span>
+                <span className="changes-count">{unstagedFiles.length}</span>
+              </button>
+              <div className="changes-section-actions">
+                <button
+                  type="button"
+                  className="changes-icon-btn"
+                  onClick={() => void runAction(() => invoke("stage_all"))}
+                  disabled={busy || unstagedFiles.length === 0}
+                  title="Stage all"
+                >
+                  <Check size={12} />
+                </button>
+                <button
+                  type="button"
+                  className="changes-icon-btn"
+                  onClick={() => void runAction(() => invoke("discard_all"))}
+                  disabled={busy || unstagedFiles.length === 0}
+                  title="Discard all"
+                >
+                  <RotateCcw size={12} />
+                </button>
+              </div>
+            </div>
+            {!expandedSections.unstaged ? null : unstagedFiles.length === 0 ? (
               <div className="changes-empty">No unstaged files</div>
             ) : viewMode === "tree" ? (
               <ul className="changes-list compact">
@@ -403,9 +557,47 @@ export default function ChangesPanel() {
               </ul>
             ) : (
               <ul className="changes-list compact">
-                {unstagedFiles.map((file) => renderFileRow(file, false))}
+                {unstagedFiles.map((file) => renderFileRow(file, "unstaged", false))}
               </ul>
             )}
+          </section>
+
+          <section className="changes-preview">
+            <div className="changes-preview-header">
+              <div>
+                <div className="changes-preview-title">Diff Preview</div>
+                <div className="changes-preview-meta">
+                  {selectedChange
+                    ? `${selectedChange.section === "staged" ? "Staged" : "Working Tree"} • ${selectedChange.path}`
+                    : "Select a file to preview changes"}
+                </div>
+              </div>
+            </div>
+            <div className="changes-preview-body diff-content-simple">
+              {diffLoading ? <p>Loading diff...</p> : null}
+              {!diffLoading && diffError ? <p className="changes-preview-error">{diffError}</p> : null}
+              {!diffLoading && !diffError && !selectedChange ? (
+                <p>Select a file to preview changes</p>
+              ) : null}
+              {!diffLoading && !diffError && selectedChange && diffText.trim().length === 0 ? (
+                <p>No diff content available</p>
+              ) : null}
+              {!diffLoading && !diffError && diffText.trim().length > 0 ? (
+                <div className="diff-simple-viewer changes-preview-diff">
+                  {diffText.split("\n").map((line, index) => {
+                    const lineClass = classifyDiffLine(line);
+                    return (
+                      <div
+                        key={`${selectedChange?.section ?? "none"}:${selectedChange?.path ?? "none"}:${index}`}
+                        className={`diff-simple-line ${lineClass}`.trim()}
+                      >
+                        {line}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </div>
           </section>
         </>
       )}

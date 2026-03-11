@@ -95,10 +95,13 @@ pub fn run() {
             commands::delete_branch,
             commands::get_working_tree_status,
             commands::stage_all,
+            commands::unstage_all,
             commands::stage_paths,
+            commands::unstage_paths,
             commands::discard_paths,
             commands::discard_all,
             commands::commit_staged,
+            commands::get_working_tree_diff,
             commands::search_commits,
         ])
         .setup(|app| {

@@ -1,16 +1,27 @@
 import { useState } from "react";
 import BranchList from "./BranchList";
 import TagList from "./TagList";
-import { GitBranch, Tag } from "lucide-react";
+import ChangesPanel from "./ChangesPanel";
+import { GitBranch, GitCommitHorizontal, Tag } from "lucide-react";
 
-type TabType = "branches" | "tags";
+type TabType = "sourceControl" | "branches" | "tags";
 
 export default function Sidebar() {
-  const [activeTab, setActiveTab] = useState<TabType>("branches");
+  const [activeTab, setActiveTab] = useState<TabType>("sourceControl");
 
   return (
     <div className="sidebar">
       <div className="sidebar-tabs" role="tablist" aria-label="Sidebar Sections">
+        <button
+          type="button"
+          className={activeTab === "sourceControl" ? "active" : ""}
+          onClick={() => setActiveTab("sourceControl")}
+          role="tab"
+          aria-selected={activeTab === "sourceControl"}
+        >
+          <GitCommitHorizontal size={13} />
+          Changes
+        </button>
         <button
           type="button"
           className={activeTab === "branches" ? "active" : ""}
@@ -33,6 +44,7 @@ export default function Sidebar() {
         </button>
       </div>
       <div className="sidebar-content">
+        {activeTab === "sourceControl" && <ChangesPanel />}
         {activeTab === "branches" && <BranchList />}
         {activeTab === "tags" && <TagList />}
       </div>

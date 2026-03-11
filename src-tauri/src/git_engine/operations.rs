@@ -242,6 +242,38 @@ pub fn stage_all(repo: &Repository) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn unstage_paths(repo: &Repository, paths: &[String]) -> anyhow::Result<()> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+
+    if let Ok(head) = repo.head() {
+        let target = head.peel_to_commit()?.into_object();
+        let pathspecs: Vec<&Path> = paths.iter().map(Path::new).collect();
+        repo.reset_default(Some(&target), pathspecs)?;
+        return Ok(());
+    }
+
+    let mut index = repo.index()?;
+    for path in paths {
+        let _ = index.remove_path(Path::new(path));
+    }
+    index.write()?;
+
+    Ok(())
+}
+
+pub fn unstage_all(repo: &Repository) -> anyhow::Result<()> {
+    let status = get_working_tree_status(repo)?;
+    let paths: Vec<String> = status
+        .into_iter()
+        .filter(|file| file.staged)
+        .map(|file| file.path)
+        .collect();
+
+    unstage_paths(repo, &paths)
+}
+
 fn remove_workdir_path(repo: &Repository, path: &str) -> anyhow::Result<()> {
     let workdir = repo
         .workdir()
@@ -279,7 +311,19 @@ pub fn discard_paths(repo: &Repository, paths: &[String]) -> anyhow::Result<()> 
 
         let mut checkout = CheckoutBuilder::new();
         checkout.force().path(repo_path);
-        repo.checkout_head(Some(&mut checkout))?;
+
+        if status.intersects(
+            Status::INDEX_NEW
+                | Status::INDEX_MODIFIED
+                | Status::INDEX_DELETED
+                | Status::INDEX_RENAMED
+                | Status::INDEX_TYPECHANGE,
+        ) {
+            let mut index = repo.index()?;
+            repo.checkout_index(Some(&mut index), Some(&mut checkout))?;
+        } else {
+            repo.checkout_head(Some(&mut checkout))?;
+        }
     }
 
     Ok(())
@@ -322,6 +366,49 @@ pub fn commit_staged(repo: &Repository, message: &str) -> anyhow::Result<String>
 
     index.write()?;
     Ok(commit_oid.to_string())
+}
+
+pub fn get_working_tree_diff(
+    repo: &Repository,
+    path: Option<&str>,
+    staged: bool,
+    context_lines: Option<usize>,
+    ignore_whitespace: Option<bool>,
+) -> anyhow::Result<String> {
+    let mut diff_opts = git2::DiffOptions::new();
+    if let Some(path) = path {
+        diff_opts.pathspec(path);
+    }
+    if let Some(context) = context_lines {
+        diff_opts.context_lines(context as u32);
+    }
+    if ignore_whitespace.unwrap_or(false) {
+        diff_opts.ignore_whitespace(true);
+    }
+
+    let diff = if staged {
+        let index = repo.index()?;
+        match repo.head() {
+            Ok(head) => {
+                let tree = head.peel_to_tree()?;
+                repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut diff_opts))?
+            }
+            Err(_) => repo.diff_tree_to_index(None, Some(&index), Some(&mut diff_opts))?,
+        }
+    } else {
+        let index = repo.index()?;
+        repo.diff_index_to_workdir(Some(&index), Some(&mut diff_opts))?
+    };
+
+    let mut diff_text = String::new();
+    diff.print(git2::DiffFormat::Patch, |_delta, _hunk, line| {
+        if let Ok(content) = std::str::from_utf8(line.content()) {
+            diff_text.push_str(content);
+        }
+        true
+    })?;
+
+    Ok(diff_text)
 }
 
 pub fn search_commits(repo: &Repository, query: &str, max_results: usize) -> anyhow::Result<Vec<CommitNode>> {

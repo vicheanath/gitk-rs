@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { PanelLeftClose, PanelLeftOpen, Settings2 } from "lucide-react";
+import { GitCommitHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, X } from "lucide-react";
 import { useAppContext } from "./context/AppContext";
 import CommitGraphList from "./components/CommitGraphList/CommitGraphList";
 import CommitDetails from "./components/CommitDetails/CommitDetails";
@@ -15,6 +15,10 @@ import SearchBar, { SearchBarRef } from "./components/SearchBar";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import "./styles/App.css";
 import "./styles/CommitGraphList.css";
+
+type EditorTab =
+  | { id: "graph"; type: "graph"; title: "Graph" }
+  | { id: `commit:${string}`; type: "commit"; commitId: string; title: string };
 
 function App() {
   const {
@@ -38,11 +42,9 @@ function App() {
   const {
     sidebarWidth,
     graphWidth,
-    detailsHeight,
     scrollContainerRef,
     handleSidebarResize,
     handleGraphResize,
-    handleDetailsResize,
     handleOpenRepo,
   } = useAppShellViewModel({ isRepoOpen, openRepository });
 
@@ -50,7 +52,76 @@ function App() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [openTabs, setOpenTabs] = useState<EditorTab[]>([
+    { id: "graph", type: "graph", title: "Graph" },
+  ]);
+  const [activeTabId, setActiveTabId] = useState<EditorTab["id"]>("graph");
   const searchBarRef = useRef<SearchBarRef>(null);
+
+  const commitTitleMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const node of nodes) {
+      map.set(node.id, node.summary || node.message.split("\n")[0] || node.id.slice(0, 7));
+    }
+    return map;
+  }, [nodes]);
+
+  const activeTab = openTabs.find((tab) => tab.id === activeTabId) ?? openTabs[0];
+
+  const openCommitTab = (commitId: string) => {
+    const tabId = `commit:${commitId}` as const;
+    const title = commitTitleMap.get(commitId) ?? commitId.slice(0, 7);
+
+    setOpenTabs((current) => {
+      if (current.some((tab) => tab.id === tabId)) {
+        return current;
+      }
+
+      return [...current, { id: tabId, type: "commit", commitId, title }];
+    });
+    setActiveTabId(tabId);
+  };
+
+  const handleCommitSelect = (commitId: string | null) => {
+    setSelectedCommit(commitId);
+    if (commitId) {
+      openCommitTab(commitId);
+    }
+  };
+
+  const closeTab = (tabId: EditorTab["id"]) => {
+    if (tabId === "graph") {
+      return;
+    }
+
+    setOpenTabs((current) => {
+      const index = current.findIndex((tab) => tab.id === tabId);
+      if (index === -1) {
+        return current;
+      }
+
+      const nextTabs = current.filter((tab) => tab.id !== tabId);
+
+      if (activeTabId === tabId) {
+        const fallback = nextTabs[index] ?? nextTabs[index - 1] ?? nextTabs[0];
+        if (fallback) {
+          setActiveTabId(fallback.id);
+          if (fallback.type === "commit") {
+            setSelectedCommit(fallback.commitId);
+          }
+        }
+      }
+
+      return nextTabs;
+    });
+  };
+
+  const activateTab = (tab: EditorTab) => {
+    setActiveTabId(tab.id);
+    if (tab.type === "commit") {
+      setSelectedCommit(tab.commitId);
+    }
+  };
 
   useKeyboardShortcuts({
     onArrowUp: selectPrevCommit,
@@ -62,6 +133,26 @@ function App() {
   const handleToggleSidebar = () => {
     setSidebarOpen((value) => !value);
   };
+
+  useEffect(() => {
+    if (!isRepoOpen) {
+      setOpenTabs([{ id: "graph", type: "graph", title: "Graph" }]);
+      setActiveTabId("graph");
+    }
+  }, [isRepoOpen]);
+
+  useEffect(() => {
+    setOpenTabs((current) =>
+      current.map((tab) => {
+        if (tab.type !== "commit") {
+          return tab;
+        }
+
+        const nextTitle = commitTitleMap.get(tab.commitId) ?? tab.commitId.slice(0, 7);
+        return nextTitle === tab.title ? tab : { ...tab, title: nextTitle };
+      })
+    );
+  }, [commitTitleMap]);
 
   useEffect(() => {
     const isTauri =
@@ -192,56 +283,89 @@ function App() {
           </>
         )}
         <div className="app-main">
-          {/* Combined Graph and Commit List in single scroll container */}
-          <div ref={scrollContainerRef} className="app-graph-list-container">
-            {loadingGraph ? (
-              <div className="graph-loading">
-                <p>Loading commit graph...</p>
-              </div>
-            ) : graphError ? (
-              <div className="graph-error">
-                <div className="graph-error-content">
-                  <p>Error loading graph: {graphError}</p>
-                  <div className="graph-error-actions">
-                    <button className="secondary-button" onClick={handleOpenRepo}>
-                      Open Another Repository
-                    </button>
+          <div className="app-editor-tabs" role="tablist" aria-label="Editor Tabs">
+            {openTabs.map((tab) => {
+              const isActive = tab.id === activeTab?.id;
+              const tabLabel = tab.type === "graph" ? "Graph" : `${tab.title} (${tab.commitId.slice(0, 7)})`;
+
+              return (
+                <div
+                  key={tab.id}
+                  className={`app-editor-tab ${isActive ? "active" : ""}`}
+                  role="tab"
+                  aria-selected={isActive}
+                >
+                  <button
+                    type="button"
+                    className="app-editor-tab-button"
+                    onClick={() => activateTab(tab)}
+                    title={tabLabel}
+                  >
+                    {tab.type === "graph" ? <GitCommitHorizontal size={13} /> : null}
+                    <span className="app-editor-tab-label">{tab.type === "graph" ? tab.title : tab.title}</span>
+                    {tab.type === "commit" ? (
+                      <span className="app-editor-tab-meta">{tab.commitId.slice(0, 7)}</span>
+                    ) : null}
+                  </button>
+                  {tab.type === "commit" ? (
                     <button
-                      className="primary-button"
-                      onClick={() => void loadCommitGraph()}
+                      type="button"
+                      className="app-editor-tab-close"
+                      onClick={() => closeTab(tab.id)}
+                      title="Close tab"
                     >
-                      Retry
+                      <X size={12} />
                     </button>
-                  </div>
+                  ) : null}
                 </div>
+              );
+            })}
+          </div>
+
+          <div className="app-tab-panel">
+            {activeTab?.type === "graph" ? (
+              <div ref={scrollContainerRef} className="app-graph-list-container">
+                {loadingGraph ? (
+                  <div className="graph-loading">
+                    <p>Loading commit graph...</p>
+                  </div>
+                ) : graphError ? (
+                  <div className="graph-error">
+                    <div className="graph-error-content">
+                      <p>Error loading graph: {graphError}</p>
+                      <div className="graph-error-actions">
+                        <button className="secondary-button" onClick={handleOpenRepo}>
+                          Open Another Repository
+                        </button>
+                        <button
+                          className="primary-button"
+                          onClick={() => void loadCommitGraph()}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <CommitGraphList
+                      nodes={nodes}
+                      edges={edges}
+                      selectedCommit={selectedCommit || undefined}
+                      onCommitSelect={handleCommitSelect}
+                      searchQuery={searchQuery}
+                      graphWidth={graphWidth}
+                    />
+                    <ResizableDivider
+                      direction="vertical"
+                      onResize={handleGraphResize}
+                    />
+                  </>
+                )}
               </div>
             ) : (
-              <>
-                <CommitGraphList
-                  nodes={nodes}
-                  edges={edges}
-                  selectedCommit={selectedCommit || undefined}
-                  onCommitSelect={setSelectedCommit}
-                  searchQuery={searchQuery}
-                  graphWidth={graphWidth}
-                />
-                <ResizableDivider
-                  direction="vertical"
-                  onResize={handleGraphResize}
-                />
-              </>
+              <CommitDetails commitId={activeTab.commitId} nodes={nodes} />
             )}
-          </div>
-          {/* Details panel below both */}
-          <ResizableDivider
-            direction="horizontal"
-            onResize={handleDetailsResize}
-          />
-          <div className="app-details" style={{ height: `${detailsHeight}px` }}>
-            <CommitDetails
-              commitId={selectedCommit || undefined}
-              nodes={nodes}
-            />
           </div>
         </div>
       </div>

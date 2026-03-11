@@ -382,9 +382,21 @@ pub fn stage_all() -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn unstage_all() -> Result<(), String> {
+    let repo = get_repo()?;
+    crate::git_engine::operations::unstage_all(&repo).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn stage_paths(paths: Vec<String>) -> Result<(), String> {
     let repo = get_repo()?;
     crate::git_engine::operations::stage_paths(&repo, &paths).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn unstage_paths(paths: Vec<String>) -> Result<(), String> {
+    let repo = get_repo()?;
+    crate::git_engine::operations::unstage_paths(&repo, &paths).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -403,6 +415,24 @@ pub fn discard_all() -> Result<(), String> {
 pub fn commit_staged(message: String) -> Result<String, String> {
     let repo = get_repo()?;
     crate::git_engine::operations::commit_staged(&repo, &message).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_working_tree_diff(
+    path: Option<String>,
+    staged: bool,
+    context_lines: Option<usize>,
+    ignore_whitespace: Option<bool>,
+) -> Result<String, String> {
+    let repo = get_repo()?;
+    crate::git_engine::operations::get_working_tree_diff(
+        &repo,
+        path.as_deref(),
+        staged,
+        context_lines,
+        ignore_whitespace,
+    )
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

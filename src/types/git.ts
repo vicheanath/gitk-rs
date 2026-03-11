@@ -45,6 +45,23 @@ export interface ChangedFile {
   deletions: number;
 }
 
+export type WorkingTreeStatus =
+  | "added"
+  | "deleted"
+  | "modified"
+  | "renamed"
+  | "typechange"
+  | "untracked";
+
+export interface WorkingTreeFile {
+  path: string;
+  staged: boolean;
+  unstaged: boolean;
+  conflicted: boolean;
+  staged_status: WorkingTreeStatus | null;
+  unstaged_status: WorkingTreeStatus | null;
+}
+
 export interface TreeNode {
   name: string;
   path: string;
