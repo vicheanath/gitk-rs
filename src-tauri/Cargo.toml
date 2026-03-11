@@ -1,6 +1,6 @@
 [package]
 name = "gitk-rs"
-version = "1.0.0"
+version = "1.0.1"
 description = "A modern GitK clone written in Rust"
 authors = ["you"]
 license = ""
