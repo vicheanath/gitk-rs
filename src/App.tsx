@@ -17,6 +17,7 @@ import ResizableDivider from "./components/ResizableDivider/ResizableDivider";
 import SettingsDialog from "./components/Settings/SettingsDialog";
 import AboutDialog from "./components/AboutDialog";
 import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog";
+import LandingPage from "./components/LandingPage";
 import { useAppShellViewModel } from "./viewmodels/useAppShellViewModel";
 import { useEditorTabsViewModel } from "./viewmodels/useEditorTabsViewModel";
 import Sidebar from "./components/Sidebar/Sidebar";
@@ -139,72 +140,17 @@ function App() {
 
   if (!isRepoOpen) {
     return (
-      <div className="flex h-screen w-full flex-col overflow-hidden">
-        <div className="min-h-screen w-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
-          <div className="mx-auto flex h-full max-w-4xl flex-col gap-2 p-4">
-            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4 shadow-lg">
-              <div className="mb-2 flex items-center gap-2">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)] text-[var(--accent)]">
-                  <FolderGit2 size={20} />
-                </span>
-                <div>
-                  <h1 className="text-2xl font-semibold tracking-tight">GitK-RS</h1>
-                  <p className="text-sm text-[var(--text-secondary)]">A modern Git visualization tool</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={handleOpenRepo}
-                  className="inline-flex items-center rounded border border-[#9be9a8] bg-[var(--accent)] px-3 py-1.5 text-sm font-semibold text-[#0b1117] transition hover:bg-[var(--accent-hover)] hover:shadow-[0_0_0_1px_var(--accent)]"
-                >
-                  Open Repository
-                </button>
-                <button
-                  onClick={() => setSettingsOpen(true)}
-                  className="inline-flex items-center rounded border border-[var(--border-color)] bg-[var(--bg-secondary)] px-3 py-1.5 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)]"
-                >
-                  Settings
-                </button>
-              </div>
-
-              <p className="mt-2 text-xs text-[var(--text-secondary)]">
-                Repository dialog will only open when you click <strong>Open Repository</strong>.
-              </p>
-            </div>
-
-            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-4">
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-                Connected Providers
-              </h2>
-              {connections.length === 0 ? (
-                <p className="text-sm text-[var(--text-secondary)]">
-                  No providers connected yet. Add accounts in Settings to manage GitHub, GitLab, Bitbucket, and Azure DevOps.
-                </p>
-              ) : (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {connections.map((connection) => (
-                    <div
-                      key={connection.id}
-                      className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2"
-                    >
-                      <p className="text-sm font-semibold">{connection.display_name}</p>
-                      <p className="text-xs text-[var(--text-secondary)]">
-                        {connection.provider} • {connection.host}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <SettingsDialog
-              open={settingsOpen}
-              onClose={() => setSettingsOpen(false)}
-            />
-          </div>
-        </div>
-      </div>
+      <>
+        <LandingPage
+          connections={connections}
+          onOpenRepository={handleOpenRepo}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
+        <SettingsDialog
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+        />
+      </>
     );
   }
 
