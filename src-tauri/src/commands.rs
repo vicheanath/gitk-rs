@@ -1,5 +1,5 @@
 use crate::app_core::AppState;
-use crate::git_engine::operations::{open_repo, BranchInfo, TagInfo};
+use crate::git_engine::operations::{open_repo, BranchInfo, TagInfo, WorkingTreeFile};
 use crate::git_engine::{build_commit_graph, CommitNode};
 use git2::Repository;
 use serde::{Deserialize, Serialize};
@@ -367,6 +367,42 @@ pub fn delete_branch(name: String) -> Result<(), String> {
     let repo = get_repo()?;
     crate::git_engine::operations::delete_branch(&repo, &name).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_working_tree_status() -> Result<Vec<WorkingTreeFile>, String> {
+    let repo = get_repo()?;
+    crate::git_engine::operations::get_working_tree_status(&repo).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn stage_all() -> Result<(), String> {
+    let repo = get_repo()?;
+    crate::git_engine::operations::stage_all(&repo).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn stage_paths(paths: Vec<String>) -> Result<(), String> {
+    let repo = get_repo()?;
+    crate::git_engine::operations::stage_paths(&repo, &paths).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn discard_paths(paths: Vec<String>) -> Result<(), String> {
+    let repo = get_repo()?;
+    crate::git_engine::operations::discard_paths(&repo, &paths).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn discard_all() -> Result<(), String> {
+    let repo = get_repo()?;
+    crate::git_engine::operations::discard_all(&repo).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn commit_staged(message: String) -> Result<String, String> {
+    let repo = get_repo()?;
+    crate::git_engine::operations::commit_staged(&repo, &message).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

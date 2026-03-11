@@ -1,6 +1,7 @@
 use crate::git_engine::commit::CommitNode;
-use git2::{BranchType, Repository};
+use git2::{build::CheckoutBuilder, BranchType, IndexAddOption, Repository, Signature, Status, StatusOptions};
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::Path;
 
 pub fn open_repo(path: &Path) -> anyhow::Result<Repository> {
@@ -121,6 +122,206 @@ pub fn delete_branch(repo: &Repository, branch_name: &str) -> anyhow::Result<()>
     let mut branch = repo.find_branch(branch_name, BranchType::Local)?;
     branch.delete()?;
     Ok(())
+}
+
+fn map_status(status: Status, staged: bool) -> Option<String> {
+    let mapped = if staged {
+        if status.contains(Status::INDEX_NEW) {
+            Some("added")
+        } else if status.contains(Status::INDEX_MODIFIED) {
+            Some("modified")
+        } else if status.contains(Status::INDEX_DELETED) {
+            Some("deleted")
+        } else if status.contains(Status::INDEX_RENAMED) {
+            Some("renamed")
+        } else if status.contains(Status::INDEX_TYPECHANGE) {
+            Some("typechange")
+        } else {
+            None
+        }
+    } else if status.contains(Status::WT_NEW) {
+        Some("untracked")
+    } else if status.contains(Status::WT_MODIFIED) {
+        Some("modified")
+    } else if status.contains(Status::WT_DELETED) {
+        Some("deleted")
+    } else if status.contains(Status::WT_RENAMED) {
+        Some("renamed")
+    } else if status.contains(Status::WT_TYPECHANGE) {
+        Some("typechange")
+    } else {
+        None
+    };
+
+    mapped.map(str::to_string)
+}
+
+fn commit_signature(repo: &Repository) -> anyhow::Result<Signature<'_>> {
+    match repo.signature() {
+        Ok(signature) => Ok(signature),
+        Err(_) => Signature::now("gitk-rs", "gitk-rs@example.com")
+            .map_err(|e| anyhow::anyhow!("Failed to create commit signature: {}", e)),
+    }
+}
+
+pub fn get_working_tree_status(repo: &Repository) -> anyhow::Result<Vec<WorkingTreeFile>> {
+    let mut options = StatusOptions::new();
+    options
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .renames_head_to_index(true)
+        .renames_index_to_workdir(true)
+        .include_ignored(false);
+
+    let statuses = repo.statuses(Some(&mut options))?;
+    let mut files = Vec::new();
+
+    for entry in statuses.iter() {
+        let status = entry.status();
+        let path = entry
+            .head_to_index()
+            .and_then(|delta| delta.new_file().path().or_else(|| delta.old_file().path()))
+            .or_else(|| {
+                entry.index_to_workdir()
+                    .and_then(|delta| delta.new_file().path().or_else(|| delta.old_file().path()))
+            })
+            .map(|path| path.to_string_lossy().to_string());
+
+        let Some(path) = path else {
+            continue;
+        };
+
+        files.push(WorkingTreeFile {
+            path,
+            staged: status.intersects(
+                Status::INDEX_NEW
+                    | Status::INDEX_MODIFIED
+                    | Status::INDEX_DELETED
+                    | Status::INDEX_RENAMED
+                    | Status::INDEX_TYPECHANGE,
+            ),
+            unstaged: status.intersects(
+                Status::WT_NEW
+                    | Status::WT_MODIFIED
+                    | Status::WT_DELETED
+                    | Status::WT_RENAMED
+                    | Status::WT_TYPECHANGE,
+            ),
+            conflicted: status.contains(Status::CONFLICTED),
+            staged_status: map_status(status, true),
+            unstaged_status: map_status(status, false),
+        });
+    }
+
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+    Ok(files)
+}
+
+pub fn stage_paths(repo: &Repository, paths: &[String]) -> anyhow::Result<()> {
+    let mut index = repo.index()?;
+
+    for path in paths {
+        let repo_path = Path::new(path);
+        let status = repo.status_file(repo_path).unwrap_or(Status::empty());
+
+        if status.contains(Status::WT_DELETED) {
+            index.remove_path(repo_path)?;
+        } else {
+            index.add_path(repo_path)?;
+        }
+    }
+
+    index.write()?;
+    Ok(())
+}
+
+pub fn stage_all(repo: &Repository) -> anyhow::Result<()> {
+    let mut index = repo.index()?;
+    index.add_all(["*"], IndexAddOption::DEFAULT, None)?;
+    index.write()?;
+    Ok(())
+}
+
+fn remove_workdir_path(repo: &Repository, path: &str) -> anyhow::Result<()> {
+    let workdir = repo
+        .workdir()
+        .ok_or_else(|| anyhow::anyhow!("Repository does not have a working directory"))?;
+    let absolute = workdir.join(path);
+
+    if !absolute.exists() {
+      return Ok(());
+    }
+
+    if absolute.is_dir() {
+        fs::remove_dir_all(&absolute)?;
+    } else {
+        fs::remove_file(&absolute)?;
+    }
+
+    Ok(())
+}
+
+pub fn discard_paths(repo: &Repository, paths: &[String]) -> anyhow::Result<()> {
+    for path in paths {
+        let repo_path = Path::new(path);
+        let status = repo.status_file(repo_path).unwrap_or(Status::empty());
+
+        if status.contains(Status::WT_NEW) && !status.intersects(
+            Status::INDEX_NEW
+                | Status::INDEX_MODIFIED
+                | Status::INDEX_DELETED
+                | Status::INDEX_RENAMED
+                | Status::INDEX_TYPECHANGE,
+        ) {
+            remove_workdir_path(repo, path)?;
+            continue;
+        }
+
+        let mut checkout = CheckoutBuilder::new();
+        checkout.force().path(repo_path);
+        repo.checkout_head(Some(&mut checkout))?;
+    }
+
+    Ok(())
+}
+
+pub fn discard_all(repo: &Repository) -> anyhow::Result<()> {
+    let status = get_working_tree_status(repo)?;
+    let paths: Vec<String> = status
+        .into_iter()
+        .filter(|file| file.unstaged && !file.staged)
+        .map(|file| file.path)
+        .collect();
+
+    discard_paths(repo, &paths)
+}
+
+pub fn commit_staged(repo: &Repository, message: &str) -> anyhow::Result<String> {
+    let message = message.trim();
+    if message.is_empty() {
+        anyhow::bail!("Commit message is required");
+    }
+
+    let status = get_working_tree_status(repo)?;
+    if !status.iter().any(|file| file.staged) {
+        anyhow::bail!("No staged changes to commit");
+    }
+
+    let mut index = repo.index()?;
+    let tree_oid = index.write_tree()?;
+    let tree = repo.find_tree(tree_oid)?;
+    let signature = commit_signature(repo)?;
+
+    let commit_oid = match repo.head() {
+        Ok(head) => {
+            let parent = head.peel_to_commit()?;
+            repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[&parent])?
+        }
+        Err(_) => repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[])?
+    };
+
+    index.write()?;
+    Ok(commit_oid.to_string())
 }
 
 pub fn search_commits(repo: &Repository, query: &str, max_results: usize) -> anyhow::Result<Vec<CommitNode>> {
@@ -283,5 +484,15 @@ pub struct TagInfo {
     pub name: String,
     pub commit_id: String,
     pub message: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WorkingTreeFile {
+    pub path: String,
+    pub staged: bool,
+    pub unstaged: bool,
+    pub conflicted: bool,
+    pub staged_status: Option<String>,
+    pub unstaged_status: Option<String>,
 }
 

@@ -93,6 +93,12 @@ pub fn run() {
             commands::checkout_branch,
             commands::create_branch,
             commands::delete_branch,
+            commands::get_working_tree_status,
+            commands::stage_all,
+            commands::stage_paths,
+            commands::discard_paths,
+            commands::discard_all,
+            commands::commit_staged,
             commands::search_commits,
         ])
         .setup(|app| {
