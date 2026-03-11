@@ -22,10 +22,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest      # Apple Silicon (aarch64)
+          - platform: macos-latest      # Apple Silicon (aarch64) — native build
             args: '--target aarch64-apple-darwin'
             rust-target: aarch64-apple-darwin
-          - platform: macos-latest      # Intel (x86_64)
+          - platform: macos-13          # Intel (x86_64) — native build, avoids cross-compile
             args: '--target x86_64-apple-darwin'
             rust-target: x86_64-apple-darwin
           - platform: ubuntu-22.04      # Linux x86_64
