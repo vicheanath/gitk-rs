@@ -24,23 +24,23 @@ function FileHeader({ path, additions, deletions, collapsed, onToggle }: {
       onClick={onToggle}
       style={{
         display: "flex", alignItems: "center", gap: 8,
-        background: "#161b22", borderBottom: "1px solid #30363d",
+        background: "color-mix(in srgb, var(--bg-secondary) 88%, transparent)", borderBottom: "1px solid var(--border-color)",
         height: 36, padding: "0 12px", cursor: "pointer", userSelect: "none", flexShrink: 0,
       }}
     >
-      <span style={{ color: "#8b949e", display: "flex", alignItems: "center" }}>
+      <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center" }}>
         {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
       </span>
-      <FileCode size={13} style={{ color: "#8b949e", flexShrink: 0 }} />
+      <FileCode size={13} style={{ color: "var(--text-secondary)", flexShrink: 0 }} />
       <span style={{
-        fontFamily: MONO, fontSize: 12, color: "#e6edf3",
+        fontFamily: MONO, fontSize: 12, color: "var(--text-primary)",
         flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
       }}>
-        {dir && <span style={{ color: "#8b949e" }}>{dir}/</span>}{name}
+        {dir && <span style={{ color: "var(--text-secondary)" }}>{dir}/</span>}{name}
       </span>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        {additions > 0 && <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 600, color: "#3fb950" }}>+{additions}</span>}
-        {deletions > 0 && <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 600, color: "#f85149" }}>-{deletions}</span>}
+        {additions > 0 && <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 600, color: "var(--success)" }}>+{additions}</span>}
+        {deletions > 0 && <span style={{ fontFamily: MONO, fontSize: 12, fontWeight: 600, color: "var(--danger)" }}>-{deletions}</span>}
       </div>
     </div>
   );
@@ -73,17 +73,17 @@ function SplitView({ commitId, files, selectedFile, contextLines, ignoreWhitespa
 
   return (
     <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
-      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden", borderRight: "1px solid #30363d" }}>
-        <div style={{ background: "rgba(248,81,73,0.16)", borderBottom: "1px solid #30363d", padding: "3px 12px", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <span style={{ fontFamily: "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace", fontSize: 13, fontWeight: 700, color: "#f85149" }}>−</span>
-          <span style={{ fontSize: 11, color: "#8b949e" }}>Before</span>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden", borderRight: "1px solid var(--border-color)" }}>
+        <div style={{ background: "color-mix(in srgb, var(--danger) 14%, transparent)", borderBottom: "1px solid var(--border-color)", padding: "3px 12px", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <span style={{ fontFamily: "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace", fontSize: 13, fontWeight: 700, color: "var(--danger)" }}>−</span>
+          <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>Before</span>
         </div>
         <CodeMirrorDiffViewer ref={leftRef}  {...shared} viewMode="old" />
       </div>
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <div style={{ background: "rgba(46,160,67,0.16)", borderBottom: "1px solid #30363d", padding: "3px 12px", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-          <span style={{ fontFamily: "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace", fontSize: 13, fontWeight: 700, color: "#3fb950" }}>+</span>
-          <span style={{ fontSize: 11, color: "#8b949e" }}>After</span>
+        <div style={{ background: "color-mix(in srgb, var(--success) 14%, transparent)", borderBottom: "1px solid var(--border-color)", padding: "3px 12px", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          <span style={{ fontFamily: "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace", fontSize: 13, fontWeight: 700, color: "var(--success)" }}>+</span>
+          <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>After</span>
         </div>
         <CodeMirrorDiffViewer ref={rightRef} {...shared} viewMode="new" />
       </div>
@@ -99,14 +99,14 @@ export default function DiffViewerSection({
 
   if (!selectedFile) {
     return (
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "#0d1117" }}>
-        <span style={{ fontSize: 12, color: "#8b949e" }}>Select a file to view diff</span>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-primary)" }}>
+        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Select a file to view diff</span>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden", border: "1px solid #30363d", borderRadius: 6 }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden", border: "1px solid var(--border-color)", borderRadius: 6 }}>
       <FileHeader
         path={selectedFile}
         additions={currentFile?.additions ?? 0}

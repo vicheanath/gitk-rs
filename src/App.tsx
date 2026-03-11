@@ -236,9 +236,9 @@ function App() {
                 <div
                   key={tab.id}
                   className={cn(
-                    "inline-flex min-w-0 max-w-[280px] items-center rounded-t-[0.4rem] border border-b-0 border-[color-mix(in_srgb,var(--border-color)_50%,transparent)] bg-[color-mix(in_srgb,var(--bg-primary)_88%,transparent)] text-[var(--text-secondary)]",
+                    "inline-flex min-w-0 max-w-[280px] items-center rounded-t-[0.4rem] border border-b-0 border-[color-mix(in_srgb,var(--border-color)_50%,transparent)] bg-[color-mix(in_srgb,var(--bg-secondary)_54%,transparent)] text-[var(--text-secondary)]",
                     isActive &&
-                      "border-[color-mix(in_srgb,var(--accent)_40%,var(--border-color))] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-[inset_0_2px_0_color-mix(in_srgb,var(--accent)_58%,transparent)]"
+                      "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--accent)_35%,transparent)]"
                   )}
                   role="tab"
                   aria-selected={isActive}

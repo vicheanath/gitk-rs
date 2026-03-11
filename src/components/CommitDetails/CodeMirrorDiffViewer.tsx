@@ -11,23 +11,23 @@ export interface CodeMirrorDiffViewerProps {
   ignoreWhitespace?: boolean;
 }
 
-// GitHub dark-mode exact colors
+// Theme-aware diff colors from application CSS variables
 const C = {
-  bg:       "#0d1117",
-  lnBg:     "#161b22",
-  lnText:   "#8b949e",
-  border:   "#21262d",
-  text:     "#e6edf3",
-  addBg:    "#12261e",
-  addLnBg:  "#1b3a2a",
-  addText:  "#aff5b4",
-  addWord:  "#1f6f43",
-  remBg:    "#2a1a1d",
-  remLnBg:  "#4a252a",
-  remText:  "#ffdcd7",
-  remWord:  "#7a3238",
-  hunkBg:   "rgba(33,87,175,0.15)",
-  hunkText: "#79c0ff",
+  bg:       "var(--bg-primary)",
+  lnBg:     "color-mix(in srgb, var(--bg-secondary) 82%, transparent)",
+  lnText:   "var(--text-secondary)",
+  border:   "color-mix(in srgb, var(--border-color) 68%, transparent)",
+  text:     "var(--text-primary)",
+  addBg:    "var(--diff-add-bg)",
+  addLnBg:  "color-mix(in srgb, var(--diff-add-border) 26%, var(--bg-secondary))",
+  addText:  "var(--diff-add-text)",
+  addWord:  "color-mix(in srgb, var(--diff-add-border) 44%, transparent)",
+  remBg:    "var(--diff-remove-bg)",
+  remLnBg:  "color-mix(in srgb, var(--diff-remove-border) 26%, var(--bg-secondary))",
+  remText:  "var(--diff-remove-text)",
+  remWord:  "color-mix(in srgb, var(--diff-remove-border) 44%, transparent)",
+  hunkBg:   "var(--diff-hunk-bg)",
+  hunkText: "var(--diff-hunk-text)",
 };
 
 // Inline char-level diff (common-prefix-suffix approach)
@@ -146,7 +146,7 @@ function DiffRow({ line }: { line: DiffLine }) {
       <td style={{ ...LN, background: add ? C.addLnBg : rem ? C.remLnBg : C.lnBg, borderBottom: `1px solid ${C.border}` }}>{line.oldNo ?? ""}</td>
       <td style={{ ...LN, background: add ? C.addLnBg : rem ? C.remLnBg : C.lnBg, borderBottom: `1px solid ${C.border}` }}>{line.newNo ?? ""}</td>
       <td style={{ ...MONO, width: 20, textAlign: "center", userSelect: "none", fontWeight: 700,
-        color: add ? "#3fb950" : rem ? "#f85149" : "transparent", borderBottom: `1px solid ${C.border}` }}>
+        color: add ? "var(--success)" : rem ? "var(--danger)" : "transparent", borderBottom: `1px solid ${C.border}` }}>
         {add ? "+" : rem ? "-" : " "}
       </td>
       <td style={{ ...MONO, padding: "0 16px", color: add ? C.addText : rem ? C.remText : C.text, whiteSpace: "pre", borderBottom: `1px solid ${C.border}` }}>
@@ -167,10 +167,10 @@ function RawRow({ lineNo, content, changed, vm }: { lineNo: number; content: str
   return (
     <tr style={{ background: changed ? (isOld ? C.remBg : C.addBg) : "transparent" }}>
       <td colSpan={2} style={{ ...LN, width: 48, background: changed ? (isOld ? C.remLnBg : C.addLnBg) : C.lnBg, borderBottom: `1px solid ${C.border}` }}>{lineNo}</td>
-      <td style={{ ...MONO, width: 20, textAlign: "center", userSelect: "none", fontWeight: 700, color: isAdded ? "#3fb950" : isRemoved ? "#f85149" : "transparent", borderBottom: `1px solid ${C.border}` }}>
+      <td style={{ ...MONO, width: 20, textAlign: "center", userSelect: "none", fontWeight: 700, color: isAdded ? "var(--success)" : isRemoved ? "var(--danger)" : "transparent", borderBottom: `1px solid ${C.border}` }}>
         {isAdded ? "+" : isRemoved ? "-" : " "}
       </td>
-      <td style={{ ...MONO, padding: "0 16px", color: changed ? (isOld ? C.remText : C.addText) : C.text, whiteSpace: "pre", borderBottom: `1px solid ${C.border}`, boxShadow: changed ? `inset 2px 0 0 ${isOld ? "#f85149" : "#3fb950"}` : "none" }}>
+      <td style={{ ...MONO, padding: "0 16px", color: changed ? (isOld ? C.remText : C.addText) : C.text, whiteSpace: "pre", borderBottom: `1px solid ${C.border}`, boxShadow: changed ? `inset 2px 0 0 ${isOld ? "var(--danger)" : "var(--success)"}` : "none" }}>
         {content || " "}
       </td>
     </tr>

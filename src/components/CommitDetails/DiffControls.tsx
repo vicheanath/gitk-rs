@@ -22,7 +22,7 @@ function SegmentedControl<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex items-center rounded-md bg-[color-mix(in_srgb,var(--bg-tertiary)_72%,transparent)] p-0.5">
+    <div className="inline-flex items-center rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_66%,transparent)] p-0.5">
       {options.map((opt) => {
         const isActive = opt.value === value;
         return (
@@ -31,10 +31,10 @@ function SegmentedControl<T extends string>({
             type="button"
             onClick={() => onChange(opt.value)}
             className={cn(
-              "rounded px-2.5 py-0.5 text-xs font-medium transition-all",
+              "rounded border border-transparent px-2.5 py-0.5 text-xs font-medium transition-colors",
               isActive
-                ? "bg-[var(--accent)] text-[#0b1117] shadow-sm"
-                : "text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+                ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+                : "text-[var(--text-secondary)] hover:border-[color-mix(in_srgb,var(--border-color)_60%,transparent)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
             )}
           >
             {opt.label}

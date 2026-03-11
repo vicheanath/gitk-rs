@@ -15,7 +15,7 @@ export default function Sidebar() {
     cn(
       "h-[26px] gap-1.5 px-1.5 text-[11px] font-medium",
       isActive &&
-        "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+        "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)] shadow-[inset_0_1px_0_color-mix(in_srgb,var(--accent)_35%,transparent)]"
     );
 
   return (
