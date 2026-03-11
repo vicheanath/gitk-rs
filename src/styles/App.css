@@ -43,7 +43,7 @@ ol {
   --bg-tertiary: #1a2430;
   --text-primary: #d9e2ec;
   --text-secondary: #94a3b8;
-  --border-color: #2b394a;
+  --border-color: color-mix(in srgb, #2b394a 58%, transparent);
   --accent: #7ee787;
   /* Alias tokens used by utility-class refactors */
   --text-muted: var(--text-secondary);
@@ -87,7 +87,7 @@ ol {
   --bg-tertiary: #1a2430;
   --text-primary: #d9e2ec;
   --text-secondary: #94a3b8;
-  --border-color: #2b394a;
+  --border-color: color-mix(in srgb, #2b394a 58%, transparent);
   --accent: #7ee787;
   --accent-hover: #56d364;
   --success: #7ee787;
@@ -127,7 +127,7 @@ ol {
   --bg-tertiary: #dde7f1;
   --text-primary: #15202b;
   --text-secondary: #52606d;
-  --border-color: #c3d1de;
+  --border-color: color-mix(in srgb, #c3d1de 62%, transparent);
   --accent: #2f9e44;
   --accent-hover: #237c35;
   --success: #1f883d;
@@ -167,7 +167,7 @@ ol {
   --bg-tertiary: #17263c;
   --text-primary: #dbe6fb;
   --text-secondary: #9cb4d6;
-  --border-color: #2d3f5f;
+  --border-color: color-mix(in srgb, #2d3f5f 60%, transparent);
   --accent: #62b0ff;
   --accent-hover: #489cf0;
   --success: #5fd38d;
@@ -181,7 +181,7 @@ ol {
   --bg-tertiary: #1c2d22;
   --text-primary: #d5e7da;
   --text-secondary: #9ab7a3;
-  --border-color: #31443a;
+  --border-color: color-mix(in srgb, #31443a 60%, transparent);
   --accent: #6bd194;
   --accent-hover: #54bf80;
   --success: #75d49a;
@@ -195,7 +195,7 @@ ol {
   --bg-tertiary: #14303c;
   --text-primary: #d7ebef;
   --text-secondary: #9fc2cc;
-  --border-color: #2f4f5b;
+  --border-color: color-mix(in srgb, #2f4f5b 60%, transparent);
   --accent: #45d1f3;
   --accent-hover: #2fc0e4;
   --success: #5ed5b6;
@@ -209,7 +209,7 @@ ol {
   --bg-tertiary: #0f4a59;
   --text-primary: #93a1a1;
   --text-secondary: #839496;
-  --border-color: #1d5f6e;
+  --border-color: color-mix(in srgb, #1d5f6e 62%, transparent);
   --accent: #2aa198;
   --accent-hover: #1f9188;
   --success: #859900;
@@ -223,7 +223,7 @@ ol {
   --bg-tertiary: #e2dbc6;
   --text-primary: #586e75;
   --text-secondary: #657b83;
-  --border-color: #c6bfa7;
+  --border-color: color-mix(in srgb, #c6bfa7 62%, transparent);
   --accent: #268bd2;
   --accent-hover: #1f79ba;
   --success: #859900;
@@ -237,7 +237,7 @@ ol {
   --bg-tertiary: #3a3d4f;
   --text-primary: #f8f8f2;
   --text-secondary: #b6b8cb;
-  --border-color: #55576c;
+  --border-color: color-mix(in srgb, #55576c 62%, transparent);
   --accent: #8be9fd;
   --accent-hover: #71d9ef;
   --success: #50fa7b;

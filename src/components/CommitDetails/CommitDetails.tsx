@@ -66,7 +66,7 @@ export default function CommitDetails({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-1.5 bg-[var(--bg-primary)] p-1.5">
+    <div className="flex h-full min-h-0 flex-col gap-1 bg-[var(--bg-primary)] p-1">
       {/* Commit Information */}
       <CommitInfo
         id={details.id}
@@ -96,7 +96,7 @@ export default function CommitDetails({
       />
 
       {/* Main Content: File Navigator + Diff Viewer */}
-      <div className="flex min-h-0 flex-1 gap-1.5">
+      <div className="flex min-h-0 flex-1 gap-1">
         <div style={{ width: `${sidebarWidth}%` }} className="min-h-0 shrink-0 overflow-hidden">
           <FileNavigator
             commitId={commitId}
@@ -108,7 +108,7 @@ export default function CommitDetails({
           />
         </div>
         <ResizableDivider direction="vertical" onResize={handleSidebarResize} />
-        <section className="min-h-0 flex-1 overflow-hidden rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_84%,transparent)]">
+        <section className="min-h-0 flex-1 overflow-hidden bg-[var(--bg-primary)]">
           <DiffViewerSection
             commitId={commitId}
             files={details.files}

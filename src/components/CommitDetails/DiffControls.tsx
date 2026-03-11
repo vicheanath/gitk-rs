@@ -22,7 +22,7 @@ function SegmentedControl<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex items-center rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] p-0.5">
+    <div className="inline-flex items-center rounded-md bg-[color-mix(in_srgb,var(--bg-tertiary)_72%,transparent)] p-0.5">
       {options.map((opt) => {
         const isActive = opt.value === value;
         return (
@@ -56,7 +56,7 @@ export default function DiffControls({
   setIgnoreWhitespace,
 }: DiffControlsProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-secondary)_72%,transparent)] px-2 py-1.5">
+    <div className="flex flex-wrap items-center gap-1.5 rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_66%,transparent)] px-1.5 py-1">
       {/* Navigator Mode */}
       <SegmentedControl
         options={[
@@ -67,7 +67,7 @@ export default function DiffControls({
         onChange={setNavigatorMode}
       />
 
-      <div className="h-4 w-px bg-[var(--border-color)]" />
+      <div className="h-4 w-px bg-[color-mix(in_srgb,var(--border-color)_50%,transparent)]" />
 
       {/* Diff Display Mode */}
       <SegmentedControl
@@ -79,7 +79,7 @@ export default function DiffControls({
         onChange={setDiffDisplayMode}
       />
 
-      <div className="h-4 w-px bg-[var(--border-color)]" />
+      <div className="h-4 w-px bg-[color-mix(in_srgb,var(--border-color)_50%,transparent)]" />
 
       {/* Context Lines */}
       <label className="inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">

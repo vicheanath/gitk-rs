@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "../ui/button";
 import { cn } from "../../lib/utils";
 
@@ -32,6 +32,17 @@ export default function CommitInfo({
   graphWidth = 0,
 }: CommitInfoProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [messageExpanded, setMessageExpanded] = useState(false);
+
+  const messageStats = useMemo(() => {
+    const lines = message.split("\n");
+    const longestLine = lines.reduce((max, line) => Math.max(max, line.length), 0);
+    return {
+      lineCount: lines.length,
+      charCount: message.length,
+      isLong: lines.length > 10 || message.length > 800 || longestLine > 180,
+    };
+  }, [message]);
 
   const handleCopySha = async () => {
     try {
@@ -58,9 +69,9 @@ export default function CommitInfo({
   };
 
   return (
-    <div className="flex shrink-0 flex-col gap-1.5 bg-[var(--bg-primary)] p-1.5">
+    <div className="flex shrink-0 flex-col gap-2 bg-[var(--bg-primary)] px-1.5 py-1">
       {/* Header */}
-      <div className="rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_80%,transparent)] px-2 py-1.5">
+      <div className="px-1 py-1.5">
         <div className="flex flex-wrap items-center justify-between gap-1.5">
           <div className="flex min-w-0 items-center gap-2">
             <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Commit</span>
@@ -91,15 +102,15 @@ export default function CommitInfo({
             <span>•</span>
             <span>{formattedDate}</span>
             <span>•</span>
-            <span className="text-[var(--success)]">+{additions}</span>
-            <span className="text-[var(--danger)]">-{deletions}</span>
+            <span className="rounded-sm bg-[color-mix(in_srgb,var(--success)_16%,transparent)] px-1 text-[var(--success)]">+{additions}</span>
+            <span className="rounded-sm bg-[color-mix(in_srgb,var(--danger)_16%,transparent)] px-1 text-[var(--danger)]">-{deletions}</span>
           </div>
         </div>
       </div>
 
       {/* Details */}
-      <div className="rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_72%,transparent)] p-2">
-        <div className="space-y-1.5">
+      <div className="px-1 pb-1">
+        <div className="space-y-2">
           <div className="grid grid-cols-[78px_1fr] gap-1.5 text-xs">
             <span className="uppercase tracking-wide text-[var(--text-muted)]">SHA</span>
             <code className="overflow-x-auto rounded bg-[var(--bg-primary)] px-1.5 py-1 font-mono text-[var(--text-primary)]">
@@ -120,12 +131,39 @@ export default function CommitInfo({
           </div>
           <div className="grid grid-cols-[78px_1fr] gap-1.5 text-xs">
             <span className="uppercase tracking-wide text-[var(--text-muted)]">Message</span>
-            <pre
-              className="whitespace-pre-wrap rounded bg-[var(--bg-primary)] px-2 py-1.5 text-[var(--text-primary)]"
-              style={{ marginLeft: `${graphWidth}px` }}
-            >
-              {message}
-            </pre>
+            <div className="min-w-0" style={{ marginLeft: `${graphWidth}px` }}>
+              <div className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-muted)]">
+                <span className="rounded bg-[var(--bg-primary)] px-1.5 py-0.5">{messageStats.lineCount} lines</span>
+                <span className="rounded bg-[var(--bg-primary)] px-1.5 py-0.5">{messageStats.charCount} chars</span>
+                {messageStats.isLong && (
+                  <span className="rounded bg-[color-mix(in_srgb,var(--accent)_18%,transparent)] px-1.5 py-0.5 text-[var(--accent)]">
+                    long message
+                  </span>
+                )}
+              </div>
+              <pre
+                className="whitespace-pre-wrap break-words rounded bg-[var(--bg-primary)] px-2 py-1.5 text-[var(--text-primary)]"
+                style={{
+                  maxHeight: messageStats.isLong && !messageExpanded ? "8.5rem" : "20rem",
+                  overflowY: "auto",
+                }}
+              >
+                {message}
+              </pre>
+              {messageStats.isLong && (
+                <div className="mt-1.5 flex items-center justify-end">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-6 text-[10px]"
+                    onClick={() => setMessageExpanded(expanded => !expanded)}
+                    title={messageExpanded ? "Collapse commit message" : "Expand commit message"}
+                  >
+                    {messageExpanded ? "Show less" : "Show full message"}
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

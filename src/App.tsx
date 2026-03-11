@@ -161,9 +161,9 @@ function App() {
 
   return (
     <div className="gitk-layout flex h-screen w-full flex-col overflow-hidden">
-      <div className="flex min-h-9 items-center gap-1 border-b border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-secondary)_94%,#000000_6%)] px-2 py-1 text-xs font-medium">
+      <div className="flex min-h-[34px] items-center gap-1 border-b border-[color-mix(in_srgb,var(--border-color)_48%,transparent)] bg-[color-mix(in_srgb,var(--bg-secondary)_94%,#000000_6%)] px-1.5 py-1 text-xs font-medium">
         <div className="flex min-w-0 flex-1 items-center gap-1">
-          <div className="inline-flex shrink-0 items-center gap-1 rounded border border-[color-mix(in_srgb,var(--border-color)_88%,#ffffff_12%)] bg-[color-mix(in_srgb,var(--bg-primary)_82%,#ffffff_18%)] px-1.5 py-0.5 text-[var(--text-primary)]" aria-label="GitK-RS">
+          <div className="inline-flex shrink-0 items-center gap-1 rounded bg-[color-mix(in_srgb,var(--bg-primary)_82%,#ffffff_18%)] px-1.5 py-0.5 text-[var(--text-primary)]" aria-label="GitK-RS">
             <FolderGit2 size={14} />
             <span className="font-semibold">GitK-RS</span>
           </div>
@@ -186,7 +186,7 @@ function App() {
         <div className="ml-auto inline-flex items-center gap-1" role="toolbar" aria-label="Window actions">
           {isRepoOpen && (
             <button
-              className="inline-flex h-6 w-7 items-center justify-center rounded border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_86%,transparent)] text-[var(--text-secondary)] transition hover:border-[color-mix(in_srgb,var(--accent)_34%,var(--border-color))] hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_78%,#ffffff_22%)] hover:text-[var(--text-primary)]"
+              className="inline-flex h-6 w-7 items-center justify-center rounded bg-[color-mix(in_srgb,var(--bg-primary)_86%,transparent)] text-[var(--text-secondary)] transition hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_78%,#ffffff_22%)] hover:text-[var(--text-primary)]"
               onClick={handleToggleSidebar}
               title="Toggle Sidebar (b)"
             >
@@ -194,7 +194,7 @@ function App() {
             </button>
           )}
           <button
-            className="inline-flex h-6 items-center gap-1 rounded border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_86%,transparent)] px-2 text-xs text-[var(--text-secondary)] transition hover:border-[color-mix(in_srgb,var(--accent)_34%,var(--border-color))] hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_78%,#ffffff_22%)] hover:text-[var(--text-primary)]"
+            className="inline-flex h-6 items-center gap-1 rounded bg-[color-mix(in_srgb,var(--bg-primary)_86%,transparent)] px-2 text-xs text-[var(--text-secondary)] transition hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_78%,#ffffff_22%)] hover:text-[var(--text-primary)]"
             onClick={() => setSettingsOpen(true)}
             title="Settings"
           >
@@ -214,7 +214,7 @@ function App() {
         {sidebarOpen && (
           <>
             <div
-              className="w-[220px] min-w-[150px] max-w-[400px] shrink-0 overflow-y-auto border-r border-[var(--border-color)] bg-[var(--bg-secondary)] text-xs"
+              className="w-[220px] min-w-[150px] max-w-[400px] shrink-0 overflow-y-auto border-r border-[color-mix(in_srgb,var(--border-color)_46%,transparent)] bg-[var(--bg-secondary)] text-xs"
               style={{ width: `${sidebarWidth}px` }}
             >
               <Sidebar />
@@ -224,7 +224,7 @@ function App() {
         )}
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div
-            className="relative z-[2] flex shrink-0 items-stretch gap-px overflow-x-auto border-b border-[var(--border-color)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--bg-secondary)_94%,#ffffff_6%),var(--bg-secondary))] px-1.5 pb-0 pt-1 [scrollbar-width:thin]"
+            className="relative z-[2] flex shrink-0 items-stretch gap-px overflow-x-auto border-b border-[color-mix(in_srgb,var(--border-color)_46%,transparent)] bg-[linear-gradient(180deg,color-mix(in_srgb,var(--bg-secondary)_94%,#ffffff_6%),var(--bg-secondary))] px-1 pb-0 pt-0.5 [scrollbar-width:thin]"
             role="tablist"
             aria-label="Editor Tabs"
           >
@@ -236,7 +236,7 @@ function App() {
                 <div
                   key={tab.id}
                   className={cn(
-                    "inline-flex min-w-0 max-w-[280px] items-center rounded-t-[0.45rem] border border-b-0 border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_88%,transparent)] text-[var(--text-secondary)]",
+                    "inline-flex min-w-0 max-w-[280px] items-center rounded-t-[0.4rem] border border-b-0 border-[color-mix(in_srgb,var(--border-color)_50%,transparent)] bg-[color-mix(in_srgb,var(--bg-primary)_88%,transparent)] text-[var(--text-secondary)]",
                     isActive &&
                       "border-[color-mix(in_srgb,var(--accent)_40%,var(--border-color))] bg-[var(--bg-primary)] text-[var(--text-primary)] shadow-[inset_0_2px_0_color-mix(in_srgb,var(--accent)_58%,transparent)]"
                   )}
@@ -245,7 +245,7 @@ function App() {
                 >
                   <button
                     type="button"
-                    className="inline-flex min-w-0 max-w-full items-center gap-1 border-none bg-transparent px-2 py-1.5 text-inherit"
+                    className="inline-flex min-w-0 max-w-full items-center gap-1 border-none bg-transparent px-1.5 py-[5px] text-inherit"
                     onClick={() => activateTab(tab)}
                     title={tabLabel}
                   >

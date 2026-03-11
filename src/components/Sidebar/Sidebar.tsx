@@ -13,14 +13,14 @@ export default function Sidebar() {
 
   const tabClass = (isActive: boolean) =>
     cn(
-      "h-7 gap-1.5 px-2 text-[11px] font-medium",
+      "h-[26px] gap-1.5 px-1.5 text-[11px] font-medium",
       isActive &&
         "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
     );
 
   return (
     <div className="flex h-full flex-col bg-[var(--bg-secondary)]">
-      <div className="flex items-center gap-1 border-b border-[var(--border-color)] p-2" role="tablist" aria-label="Sidebar Sections">
+      <div className="flex items-center gap-1 border-b border-[color-mix(in_srgb,var(--border-color)_46%,transparent)] p-1.5" role="tablist" aria-label="Sidebar Sections">
         <Button
           variant="tab"
           className={tabClass(activeTab === "sourceControl")}
@@ -52,7 +52,7 @@ export default function Sidebar() {
           Tags
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2">
+      <div className="min-h-0 flex-1 overflow-auto p-1.5">
         {activeTab === "sourceControl" && <ChangesPanel />}
         {activeTab === "branches" && <BranchList />}
         {activeTab === "tags" && <TagList />}

@@ -11,19 +11,19 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClass: Record<ButtonVariant, string> = {
   default:
-    "border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]",
+    "border border-[color-mix(in_srgb,var(--border-primary)_68%,transparent)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]",
   outline:
-    "border border-[var(--border-primary)] bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]",
+    "border border-[color-mix(in_srgb,var(--border-primary)_62%,transparent)] bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]",
   ghost: "border border-transparent bg-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-secondary)]",
   destructive:
-    "border border-[var(--border-primary)] bg-transparent text-[var(--danger)] hover:bg-[var(--bg-secondary)]",
+    "border border-[color-mix(in_srgb,var(--border-primary)_62%,transparent)] bg-transparent text-[var(--danger)] hover:bg-[var(--bg-secondary)]",
   tab:
-    "border border-transparent bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-primary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+    "border border-transparent bg-transparent text-[var(--text-secondary)] hover:border-[color-mix(in_srgb,var(--border-primary)_60%,transparent)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
 };
 
 const sizeClass: Record<ButtonSize, string> = {
-  sm: "h-7 px-2 text-xs",
-  md: "h-8 px-3 text-sm",
+  sm: "h-[26px] px-1.5 text-xs",
+  md: "h-[30px] px-2.5 text-sm",
   icon: "h-6 w-6",
 };
 

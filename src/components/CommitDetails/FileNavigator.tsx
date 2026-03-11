@@ -20,8 +20,8 @@ export default function FileNavigator({
   filesCount,
 }: FileNavigatorProps) {
   return (
-    <aside className="flex min-h-0 h-full flex-col overflow-hidden rounded-md bg-[color-mix(in_srgb,var(--bg-secondary)_84%,transparent)]">
-      <div className="shrink-0 border-b border-[var(--border-color)] px-2 py-1.5 text-xs font-medium text-[var(--text-secondary)]">
+    <aside className="flex min-h-0 h-full flex-col overflow-hidden bg-[var(--bg-primary)]">
+      <div className="shrink-0 px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">
         Changed files
         <span className="ml-1.5 rounded bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]">{filesCount}</span>
       </div>
