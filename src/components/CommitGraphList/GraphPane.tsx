@@ -68,8 +68,12 @@ export default function GraphPane({
     const pos = positions.get(node.id);
     return pos ? Math.max(acc, pos.x) : acc;
   }, 0);
-  const graphColumnWidth = Math.max(graphWidth, Math.ceil(maxX + 24));
-  const svgWidth = graphColumnWidth + 8;
+  const rawGraphWidth = Math.ceil(maxX + 24);
+  const graphColumnWidth = Math.max(graphWidth, 1);
+  const drawableWidth = Math.max(graphColumnWidth - 16, 1);
+  const xScale = rawGraphWidth > drawableWidth ? drawableWidth / rawGraphWidth : 1;
+  const projectX = (x: number) => Math.round(x * xScale + 8);
+  const svgWidth = graphColumnWidth;
 
   const nodeToRowIndex = new Map<string, number>();
   filteredNodes.forEach((node, idx) => nodeToRowIndex.set(node.id, idx));
@@ -83,7 +87,7 @@ export default function GraphPane({
     const laneData = laneRows.get(pos.lane);
     if (!laneData) {
       laneRows.set(pos.lane, {
-        x: pos.x,
+        x: projectX(pos.x),
         color: getNodeColor(node.id, branchColors),
         rows: [rowIndex],
       });
@@ -113,8 +117,8 @@ export default function GraphPane({
 
           return {
             key: `${node.id}-${parentHash}`,
-            fromX: fromPos.x,
-            toX: toPos.x,
+            fromX: projectX(fromPos.x),
+            toX: projectX(toPos.x),
             fromY: Math.round(fromRow * ROW_HEIGHT + ROW_HEIGHT / 2),
             toY: Math.round(toRow * ROW_HEIGHT + ROW_HEIGHT / 2),
             color: getNodeColor(node.id, branchColors),
@@ -139,8 +143,8 @@ export default function GraphPane({
 
             return {
               key: `${edge.from}-${edge.to}`,
-              fromX: fromPos.x,
-              toX: toPos.x,
+              fromX: projectX(fromPos.x),
+              toX: projectX(toPos.x),
               fromY: Math.round(fromRow * ROW_HEIGHT + ROW_HEIGHT / 2),
               toY: Math.round(toRow * ROW_HEIGHT + ROW_HEIGHT / 2),
               color: getNodeColor(edge.from, branchColors),
@@ -148,12 +152,9 @@ export default function GraphPane({
           })
           .filter((c): c is NonNullable<typeof c> => c !== null);
 
-  // Center the SVG horizontally if it's smaller than the available width
-  const svgOffset = Math.max(0, (graphWidth - svgWidth) / 2);
-
   return (
     <div className="graph-svg-wrapper" style={{ width: `${graphWidth}px` }}>
-      <svg className="graph-svg" width={svgWidth} height={totalHeight} style={{ marginLeft: `${svgOffset}px` }}>
+      <svg className="graph-svg" width={svgWidth} height={totalHeight}>
         {/* Row highlight backgrounds (selected/hover) — drawn first, below everything */}
         {filteredNodes.map((node, rowIndex) => {
           const isSelected = node.id === selectedCommit;
@@ -250,7 +251,7 @@ export default function GraphPane({
           return (
             <g
               key={node.id}
-              transform={`translate(${pos.x}, ${rowY})`}
+              transform={`translate(${projectX(pos.x)}, ${rowY})`}
               style={{ pointerEvents: "none" }}
             >
               {/* Drop shadow */}

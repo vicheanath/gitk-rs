@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { CommitNode, GraphEdge } from "../../types/git";
 import GraphPane from "./GraphPane";
 import { useCommitGraphListViewModel } from "../../viewmodels/useCommitGraphListViewModel";
@@ -14,9 +15,8 @@ function formatDate(timestamp: number): string {
   return `${y}-${mo}-${day} ${h}:${min}`;
 }
 
-function trimSummary(message: string): string {
-  const summary = message.split("\n")[0];
-  return summary.length > 72 ? `${summary.slice(0, 71)}\u2026` : summary;
+function getSummaryLine(message: string): string {
+  return message.split("\n")[0] ?? "";
 }
 
 interface CommitGraphListProps {
@@ -58,6 +58,19 @@ export default function CommitGraphList({
     onCommitSelect(commitId);
     scrollToCommit(commitId);
   };
+
+  const branchHeadsByCommit = useMemo(() => {
+    const map = new Map<string, Array<{ name: string; commit_id: string }>>();
+    for (const branch of branches) {
+      const existing = map.get(branch.commit_id);
+      if (existing) {
+        existing.push(branch);
+      } else {
+        map.set(branch.commit_id, [branch]);
+      }
+    }
+    return map;
+  }, [branches]);
 
   if (!layout || nodes.length === 0) {
     return (
@@ -116,9 +129,9 @@ export default function CommitGraphList({
             const isSelected = node.id === selectedCommit;
             const isHovered = node.id === hoveredNode;
             const isMerge = node.parents.length > 1;
-            const branchHeads = branches.filter((b) => b.commit_id === node.id);
+            const branchHeads = branchHeadsByCommit.get(node.id) ?? [];
             const tags = commitTags.get(node.id) ?? [];
-            const summary = trimSummary(node.message);
+            const summary = getSummaryLine(node.message);
 
             return (
               <div
