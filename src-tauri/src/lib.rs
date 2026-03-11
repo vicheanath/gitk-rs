@@ -1,8 +1,52 @@
-use tauri::Manager;
+use tauri::{
+    menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
+    Emitter, Manager, Runtime,
+};
 
 mod app_core;
 mod commands;
 mod git_engine;
+
+fn build_native_menu<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<tauri::menu::Menu<R>> {
+    let open_repository = MenuItemBuilder::with_id("open_repository", "Open Repository...")
+        .accelerator("CmdOrCtrl+O")
+        .build(manager)?;
+    let reload_graph = MenuItemBuilder::with_id("reload_graph", "Reload Graph")
+        .accelerator("CmdOrCtrl+R")
+        .build(manager)?;
+    let focus_search = MenuItemBuilder::with_id("focus_search", "Focus Search")
+        .accelerator("CmdOrCtrl+F")
+        .build(manager)?;
+    let toggle_sidebar = MenuItemBuilder::with_id("toggle_sidebar", "Toggle Sidebar")
+        .accelerator("CmdOrCtrl+B")
+        .build(manager)?;
+    let open_settings = MenuItemBuilder::with_id("open_settings", "Settings")
+        .accelerator("CmdOrCtrl+,")
+        .build(manager)?;
+    let quit = PredefinedMenuItem::quit(manager, Some("Quit GitK-RS"))?;
+
+    let app_menu = SubmenuBuilder::new(manager, "GitK-RS")
+        .item(&open_settings)
+        .separator()
+        .item(&quit)
+        .build()?;
+
+    let file_menu = SubmenuBuilder::new(manager, "File")
+        .item(&open_repository)
+        .item(&reload_graph)
+        .build()?;
+
+    let view_menu = SubmenuBuilder::new(manager, "View")
+        .item(&focus_search)
+        .item(&toggle_sidebar)
+        .build()?;
+
+    MenuBuilder::new(manager)
+        .item(&app_menu)
+        .item(&file_menu)
+        .item(&view_menu)
+        .build()
+}
 
 pub fn run() {
     tauri::Builder::default()
@@ -23,6 +67,24 @@ pub fn run() {
             commands::search_commits,
         ])
         .setup(|app| {
+            let menu = build_native_menu(app)?;
+            app.set_menu(menu)?;
+
+            app.on_menu_event(|app, event| {
+                let action = match event.id().as_ref() {
+                    "open_repository" => Some("open_repository"),
+                    "reload_graph" => Some("reload_graph"),
+                    "focus_search" => Some("focus_search"),
+                    "toggle_sidebar" => Some("toggle_sidebar"),
+                    "open_settings" => Some("open_settings"),
+                    _ => None,
+                };
+
+                if let Some(action) = action {
+                    let _ = app.emit("native-menu-action", action);
+                }
+            });
+
             #[cfg(debug_assertions)]
             {
                 if let Some(window) = app.get_webview_window("main") {

@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { PanelLeftClose, PanelLeftOpen, Settings2 } from "lucide-react";
 import { useAppContext } from "./context/AppContext";
 import CommitGraphList from "./components/CommitGraphList/CommitGraphList";
@@ -10,7 +11,6 @@ import { useAppShellViewModel } from "./viewmodels/useAppShellViewModel";
 import Sidebar from "./components/Sidebar/Sidebar";
 import SearchBar, { SearchBarRef } from "./components/SearchBar";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
-import AppMenu from "./components/AppMenu";
 import "./styles/App.css";
 import "./styles/CommitGraphList.css";
 
@@ -58,6 +58,45 @@ function App() {
     setSidebarOpen((value) => !value);
   };
 
+  useEffect(() => {
+    const isTauri =
+      typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+    if (!isTauri) {
+      return;
+    }
+
+    let unlisten: (() => void) | undefined;
+
+    void listen<string>("native-menu-action", (event) => {
+      switch (event.payload) {
+        case "open_repository":
+          void handleOpenRepo();
+          break;
+        case "reload_graph":
+          if (isRepoOpen) {
+            void loadCommitGraph();
+          }
+          break;
+        case "focus_search":
+          searchBarRef.current?.focus();
+          break;
+        case "toggle_sidebar":
+          setSidebarOpen((value) => !value);
+          break;
+        case "open_settings":
+          setSettingsOpen(true);
+          break;
+      }
+    }).then((cleanup) => {
+      unlisten = cleanup;
+    });
+
+    return () => {
+      unlisten?.();
+    };
+  }, [handleOpenRepo, isRepoOpen, loadCommitGraph]);
+
   if (!isRepoOpen) {
     return (
       <div className="app">
@@ -104,14 +143,6 @@ function App() {
           </div>
         )}
         <div className="app-title-actions">
-          <AppMenu
-            sidebarOpen={sidebarOpen}
-            hasRepository={isRepoOpen}
-            onOpenRepository={handleOpenRepo}
-            onReloadGraph={() => void loadCommitGraph()}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onToggleSidebar={handleToggleSidebar}
-          />
           {isRepoOpen && (
             <button
               className="sidebar-toggle-btn"
