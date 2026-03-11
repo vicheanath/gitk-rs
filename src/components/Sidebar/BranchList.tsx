@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { Card } from "../ui/card";
 
 type BranchTreeNode =
   | {
@@ -89,14 +88,14 @@ function buildBranchTree(branches: Branch[]): BranchTreeNode[] {
   return toNodes(root);
 }
 
-function collectFolderPaths(nodes: BranchTreeNode[], acc = new Set<string>()): Set<string> {
-  for (const node of nodes) {
-    if (node.type === "folder") {
-      acc.add(node.path);
-      collectFolderPaths(node.children, acc);
-    }
+function getAncestorFolderPaths(path: string): string[] {
+  const parts = path.split("/").filter(Boolean);
+  const folders = parts.slice(0, -1);
+  const ancestors: string[] = [];
+  for (let i = 0; i < folders.length; i += 1) {
+    ancestors.push(folders.slice(0, i + 1).join("/"));
   }
-  return acc;
+  return ancestors;
 }
 
 export default function BranchList() {
@@ -127,9 +126,14 @@ export default function BranchList() {
   const branchTree = useMemo(() => buildBranchTree(branches), [branches]);
 
   useEffect(() => {
-    const allFolderPaths = collectFolderPaths(branchTree);
-    setExpandedFolders(allFolderPaths);
-  }, [branchTree]);
+    const currentBranch = branches.find((branch) => branch.is_current);
+    if (!currentBranch) {
+      setExpandedFolders(new Set());
+      return;
+    }
+
+    setExpandedFolders(new Set(getAncestorFolderPaths(currentBranch.name)));
+  }, [branches]);
 
   const toggleFolder = (folderPath: string) => {
     setExpandedFolders((prev) => {
@@ -263,8 +267,8 @@ export default function BranchList() {
   }
 
   return (
-    <Card className="space-y-2 p-2">
-      <div className="flex items-center justify-between gap-2">
+    <div className="space-y-1.5 px-1 py-1">
+      <div className="flex items-center justify-between gap-2 px-1">
         <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           Branches ({branches.length})
         </h3>
@@ -292,10 +296,10 @@ export default function BranchList() {
         onClose={() => setShowCreateDialog(false)}
         onCreated={loadBranches}
       />
-      <ul className="space-y-1">
+      <ul className="space-y-0.5">
         {branchTree.map((node) => renderBranchNode(node))}
       </ul>
-    </Card>
+    </div>
   );
 }
 

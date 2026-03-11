@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { Tag } from "../../types/git";
 import { RefreshCw, Tag as TagIcon } from "lucide-react";
 import { Button } from "../ui/button";
-import { Card } from "../ui/card";
 
 export default function TagList() {
   const [tags, setTags] = useState<Tag[]>([]);
@@ -37,8 +36,8 @@ export default function TagList() {
   }
 
   return (
-    <Card className="space-y-2 p-2">
-      <div className="flex items-center justify-between gap-2">
+    <div className="space-y-1.5 px-1 py-1">
+      <div className="flex items-center justify-between gap-2 px-1">
         <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           Tags ({tags.length})
         </h3>
@@ -55,15 +54,15 @@ export default function TagList() {
       </div>
 
       {tags.length === 0 ? (
-        <div className="rounded border border-dashed border-[var(--border-primary)] px-3 py-4 text-xs text-[var(--text-secondary)]">
+        <div className="px-3 py-4 text-xs text-[var(--text-secondary)]">
           No tags found
         </div>
       ) : (
-        <ul className="space-y-1">
+        <ul className="space-y-0.5">
           {tags.map((tag) => (
             <li
               key={tag.name}
-              className="space-y-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)] px-2 py-1"
+              className="space-y-0.5 border-b border-[color-mix(in_srgb,var(--border-color)_40%,transparent)] px-2 py-1"
             >
               <div className="flex items-center gap-1.5">
                 <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--accent-primary)]">
@@ -81,7 +80,7 @@ export default function TagList() {
           ))}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }
 

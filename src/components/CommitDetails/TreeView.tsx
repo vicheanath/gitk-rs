@@ -65,9 +65,9 @@ export default function TreeView({
       <div key={node.path}>
         <div
           className={cn(
-            "group flex cursor-pointer items-center gap-1.5 rounded py-[3px] pr-2 text-xs transition-colors",
-            "hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_65%,transparent)]",
-            isSelected && "bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--text-primary)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]"
+            "group flex cursor-pointer items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--border-color)_35%,transparent)] py-[3px] pr-2 text-xs transition-colors",
+            "hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)]",
+            isSelected && "bg-[color-mix(in_srgb,var(--accent)_12%,transparent)] text-[var(--text-primary)]"
           )}
           style={{ paddingLeft: `${level * 14 + 6}px` }}
           onClick={() => {
@@ -138,7 +138,7 @@ export default function TreeView({
   }
 
   return (
-    <div className="py-1">
+    <div>
       {tree.map((node) => renderTreeNode(node))}
     </div>
   );

@@ -44,7 +44,7 @@ export default function FileList({
   }
 
   return (
-    <ul className="py-1">
+    <ul>
       {rows.map(({ file, selected }) => {
         const cfg = STATUS_CONFIG[file.status] ?? { icon: <FileQuestion size={13} />, badge: "?", badgeClass: "", color: "var(--text-muted)" };
         const fileName = file.path.split("/").pop() ?? file.path;
@@ -54,9 +54,9 @@ export default function FileList({
           <li
             key={file.path}
             className={cn(
-              "group flex cursor-pointer items-center gap-2 px-2 py-[3px] text-xs transition-colors",
-              "hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_65%,transparent)]",
-              selected && "bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]"
+              "group flex cursor-pointer items-center gap-2 border-b border-[color-mix(in_srgb,var(--border-color)_35%,transparent)] px-2 py-[3px] text-xs transition-colors",
+              "hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)]",
+              selected && "bg-[color-mix(in_srgb,var(--accent)_12%,transparent)]"
             )}
             onClick={() => onFileSelect(file.path)}
           >
