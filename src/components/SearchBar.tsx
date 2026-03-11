@@ -5,6 +5,7 @@ import {
   forwardRef,
   useImperativeHandle,
 } from "react";
+import { Search, X } from "lucide-react";
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -47,7 +48,9 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
 
     return (
       <div className="search-bar classic-gitk">
-        <span className="search-icon">🔍</span>
+        <span className="search-icon">
+          <Search size={14} />
+        </span>
         <input
           ref={inputRef}
           type="text"
@@ -62,7 +65,7 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
             onClick={() => setQuery("")}
             title="Clear search"
           >
-            ×
+            <X size={14} />
           </button>
         )}
       </div>

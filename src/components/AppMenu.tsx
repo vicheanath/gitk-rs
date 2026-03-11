@@ -1,4 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  FolderOpen,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  RefreshCw,
+  Settings2,
+} from "lucide-react";
 
 interface AppMenuProps {
   sidebarOpen: boolean;
@@ -58,31 +66,34 @@ export default function AppMenu({
         onClick={() => setOpen((value) => !value)}
         title="Menu"
       >
-        Menu
+        <Menu size={16} />
       </button>
       {open && (
         <div className="app-menu-popover">
           <button className="app-menu-item" onClick={() => run(onOpenRepository)}>
-            <span>Open Repository...</span>
+            <span className="app-menu-label"><FolderOpen size={14} />Open Repository...</span>
           </button>
           <button
             className="app-menu-item"
             onClick={() => run(onReloadGraph)}
             disabled={!hasRepository}
           >
-            <span>Reload Graph</span>
+            <span className="app-menu-label"><RefreshCw size={14} />Reload Graph</span>
           </button>
           <button
             className="app-menu-item"
             onClick={() => run(onToggleSidebar)}
             disabled={!hasRepository}
           >
-            <span>{sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}</span>
+            <span className="app-menu-label">
+              {sidebarOpen ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+              {sidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+            </span>
             <span className="app-menu-shortcut">B</span>
           </button>
           <div className="app-menu-divider" />
           <button className="app-menu-item" onClick={() => run(onOpenSettings)}>
-            <span>Settings</span>
+            <span className="app-menu-label"><Settings2 size={14} />Settings</span>
           </button>
         </div>
       )}

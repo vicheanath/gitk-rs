@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { PanelLeftClose, PanelLeftOpen, Settings2 } from "lucide-react";
 import { useAppContext } from "./context/AppContext";
 import CommitGraphList from "./components/CommitGraphList/CommitGraphList";
 import CommitDetails from "./components/CommitDetails/CommitDetails";
@@ -117,7 +118,7 @@ function App() {
               onClick={handleToggleSidebar}
               title="Toggle Sidebar (b)"
             >
-              ☰
+              {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
             </button>
           )}
           <ThemeToggle />
@@ -126,7 +127,7 @@ function App() {
             onClick={() => setSettingsOpen(true)}
             title="Settings"
           >
-            ⚙
+            <Settings2 size={16} />
           </button>
         </div>
       </div>

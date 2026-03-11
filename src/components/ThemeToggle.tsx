@@ -1,4 +1,5 @@
 import { useSettings } from "../context/SettingsContext";
+import { Moon, Sun } from "lucide-react";
 
 export default function ThemeToggle() {
   const { settings, updateSettings } = useSettings();
@@ -14,7 +15,7 @@ export default function ThemeToggle() {
       onClick={toggleTheme}
       title={`Switch to ${settings.theme === "light" ? "dark" : "light"} theme`}
     >
-      {settings.theme === "light" ? "🌙" : "☀️"}
+      {settings.theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
     </button>
   );
 }
