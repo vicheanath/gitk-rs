@@ -198,3 +198,24 @@ pub fn remove_connection(connection_id: &str) -> anyhow::Result<()> {
 
     Ok(())
 }
+
+pub fn get_connection_with_token(connection_id: &str) -> anyhow::Result<(AuthConnection, String)> {
+    let id = connection_id.trim();
+    if id.is_empty() {
+        anyhow::bail!("Connection id is required");
+    }
+
+    let store = load_store()?;
+    let connection = store
+        .connections
+        .into_iter()
+        .find(|current| current.id == id)
+        .ok_or_else(|| anyhow::anyhow!("Connection not found"))?;
+
+    let entry = keyring::Entry::new(KEYRING_SERVICE, id)?;
+    let token = entry
+        .get_password()
+        .map_err(|_| anyhow::anyhow!("No token stored for this connection"))?;
+
+    Ok((connection, token))
+}

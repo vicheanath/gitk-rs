@@ -110,6 +110,8 @@ pub fn run() {
             commands::list_git_auth_connections,
             commands::upsert_git_auth_connection,
             commands::remove_git_auth_connection,
+            commands::list_provider_repositories,
+            commands::clone_repository,
             commands::open_url,
         ])
         .setup(|app| {

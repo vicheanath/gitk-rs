@@ -28,6 +28,8 @@ petgraph = "0.6"
 dirs = "5"
 keyring = "2"
 open = "5"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+urlencoding = "2"
 
 [features]
 # This feature is used for production builds or when `devPath` points to the filesystem

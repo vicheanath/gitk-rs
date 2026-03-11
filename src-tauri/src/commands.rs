@@ -3,6 +3,7 @@ use crate::auth::{self, AuthConnection, AuthConnectionInput};
 use crate::git_engine::operations::{open_repo, BranchInfo, TagInfo, WorkingTreeFile};
 use crate::git_engine::{build_commit_graph, CommitNode};
 use git2::Repository;
+use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -462,6 +463,91 @@ pub fn open_url(url: String) -> Result<(), String> {
     open::that(&url).map_err(|e| format!("Failed to open URL: {}", e))
 }
 
+#[tauri::command]
+pub fn list_provider_repositories(
+    connection_id: String,
+    query: Option<String>,
+    limit: Option<usize>,
+) -> Result<Vec<ProviderRepository>, String> {
+    let (connection, token) =
+        auth::get_connection_with_token(&connection_id).map_err(|e| e.to_string())?;
+
+    let max_items = limit.unwrap_or(50).clamp(1, 100);
+    let q = query.unwrap_or_default().trim().to_string();
+
+    match connection.provider {
+        crate::auth::GitProvider::Github => {
+            fetch_github_repositories(&connection.host, &token, &q, max_items)
+        }
+        crate::auth::GitProvider::Gitlab => {
+            fetch_gitlab_repositories(&connection.host, &token, &q, max_items)
+        }
+        crate::auth::GitProvider::Bitbucket => Err(
+            "Bitbucket repository listing is not implemented yet. You can still clone by URL."
+                .to_string(),
+        ),
+        crate::auth::GitProvider::AzureDevops => Err(
+            "Azure DevOps repository listing is not implemented yet. You can still clone by URL."
+                .to_string(),
+        ),
+    }
+}
+
+#[tauri::command]
+pub fn clone_repository(
+    repo_url: String,
+    destination_parent: String,
+    connection_id: Option<String>,
+) -> Result<String, String> {
+    let trimmed = repo_url.trim();
+    if trimmed.is_empty() {
+        return Err("Repository URL is required".to_string());
+    }
+
+    let parent_path = PathBuf::from(destination_parent.trim());
+    if !parent_path.exists() {
+        return Err("Destination folder does not exist".to_string());
+    }
+    if !parent_path.is_dir() {
+        return Err("Destination path must be a folder".to_string());
+    }
+
+    let repo_dir_name = infer_repo_dir_name(trimmed)?;
+    let destination = parent_path.join(repo_dir_name);
+    if destination.exists() {
+        return Err(format!(
+            "Destination already exists: {}",
+            destination.to_string_lossy()
+        ));
+    }
+
+    let mut builder = git2::build::RepoBuilder::new();
+
+    if let Some(connection_id) = connection_id {
+        let (connection, token) =
+            auth::get_connection_with_token(&connection_id).map_err(|e| e.to_string())?;
+        let mut fetch = git2::FetchOptions::new();
+        let mut callbacks = git2::RemoteCallbacks::new();
+        callbacks.credentials(move |_url, username_from_url, _allowed| {
+            let username = username_from_url.unwrap_or(match connection.provider {
+                crate::auth::GitProvider::Github => "x-access-token",
+                crate::auth::GitProvider::Gitlab => "oauth2",
+                crate::auth::GitProvider::Bitbucket => "x-token-auth",
+                crate::auth::GitProvider::AzureDevops => "git",
+            });
+            git2::Cred::userpass_plaintext(username, &token)
+        });
+        fetch.remote_callbacks(callbacks);
+        builder.fetch_options(fetch);
+    }
+
+    builder
+        .clone(trimmed, &destination)
+        .map_err(|e| format!("Failed to clone repository: {}", e.message()))?;
+
+    Ok(destination.to_string_lossy().to_string())
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CommitGraphResponse {
     pub nodes: Vec<CommitNode>,
@@ -496,5 +582,214 @@ pub struct ChangedFile {
     pub status: String,
     pub additions: i32,
     pub deletions: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProviderRepository {
+    pub id: String,
+    pub name: String,
+    pub full_name: String,
+    pub clone_url: String,
+    pub web_url: String,
+    pub private: bool,
+    pub provider: String,
+    pub host: String,
+}
+
+fn infer_repo_dir_name(url: &str) -> Result<String, String> {
+    let cleaned = url.trim_end_matches('/');
+    let last = cleaned
+        .rsplit('/')
+        .next()
+        .ok_or_else(|| "Invalid repository URL".to_string())?;
+    let candidate = last.strip_suffix(".git").unwrap_or(last).trim();
+    if candidate.is_empty() {
+        return Err("Could not infer repository folder name from URL".to_string());
+    }
+    Ok(candidate.to_string())
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubRepo {
+    id: i64,
+    name: String,
+    full_name: String,
+    clone_url: String,
+    html_url: String,
+    private: bool,
+}
+
+fn fetch_github_repositories(
+    host: &str,
+    token: &str,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<ProviderRepository>, String> {
+    let client = Client::builder()
+        .user_agent("gitk-rs")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let api_candidates = github_api_bases_for_host(host);
+    let endpoint_for = |api_base: &str| {
+        if query.is_empty() {
+            format!("{}/user/repos?per_page={}&sort=updated", api_base, limit)
+        } else {
+            format!(
+                "{}/search/repositories?q={}&per_page={}",
+                api_base,
+                urlencoding::encode(query),
+                limit
+            )
+        }
+    };
+
+    let mut last_error = String::new();
+    let mut successful_response = None;
+
+    for api_base in &api_candidates {
+        let endpoint = endpoint_for(api_base);
+        let response = client
+            .get(&endpoint)
+            .bearer_auth(token)
+            .header("Accept", "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .send()
+            .map_err(|e| e.to_string())?;
+
+        if response.status().is_success() {
+            successful_response = Some(response);
+            break;
+        }
+
+        last_error = format!(
+            "GitHub API error on {}: HTTP {}",
+            endpoint,
+            response.status()
+        );
+
+        if response.status().as_u16() == 401 || response.status().as_u16() == 403 {
+            return Err(last_error);
+        }
+    }
+
+    let response = successful_response.ok_or_else(|| {
+        if last_error.is_empty() {
+            "Failed to call GitHub API".to_string()
+        } else {
+            last_error
+        }
+    })?;
+
+    if query.is_empty() {
+        let repos: Vec<GithubRepo> = response.json().map_err(|e| e.to_string())?;
+        return Ok(repos
+            .into_iter()
+            .map(|repo| ProviderRepository {
+                id: repo.id.to_string(),
+                name: repo.name,
+                full_name: repo.full_name,
+                clone_url: repo.clone_url,
+                web_url: repo.html_url,
+                private: repo.private,
+                provider: "github".to_string(),
+                host: host.to_string(),
+            })
+            .collect());
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct GithubSearch {
+        items: Vec<GithubRepo>,
+    }
+
+    let result: GithubSearch = response.json().map_err(|e| e.to_string())?;
+    Ok(result
+        .items
+        .into_iter()
+        .map(|repo| ProviderRepository {
+            id: repo.id.to_string(),
+            name: repo.name,
+            full_name: repo.full_name,
+            clone_url: repo.clone_url,
+            web_url: repo.html_url,
+            private: repo.private,
+            provider: "github".to_string(),
+            host: host.to_string(),
+        })
+        .collect())
+}
+
+fn github_api_bases_for_host(host: &str) -> Vec<String> {
+    let normalized = host.trim().trim_start_matches("https://").trim_start_matches("http://").trim_end_matches('/');
+
+    if normalized.eq_ignore_ascii_case("github.com") {
+        return vec!["https://api.github.com".to_string()];
+    }
+
+    if normalized.starts_with("api.") {
+        return vec![format!("https://{}", normalized)];
+    }
+
+    vec![
+        format!("https://api.{}", normalized),
+        format!("https://{}/api/v3", normalized),
+    ]
+}
+
+#[derive(Debug, Deserialize)]
+struct GitlabRepo {
+    id: i64,
+    name: String,
+    path_with_namespace: String,
+    http_url_to_repo: String,
+    web_url: String,
+    visibility: Option<String>,
+}
+
+fn fetch_gitlab_repositories(
+    host: &str,
+    token: &str,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<ProviderRepository>, String> {
+    let client = Client::builder()
+        .user_agent("gitk-rs")
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut endpoint = format!(
+        "https://{}/api/v4/projects?membership=true&per_page={}&order_by=last_activity_at",
+        host, limit
+    );
+    if !query.is_empty() {
+        endpoint.push_str("&search=");
+        endpoint.push_str(&urlencoding::encode(query));
+    }
+
+    let response = client
+        .get(endpoint)
+        .header("PRIVATE-TOKEN", token)
+        .send()
+        .map_err(|e| e.to_string())?;
+
+    if !response.status().is_success() {
+        return Err(format!("GitLab API error: HTTP {}", response.status()));
+    }
+
+    let repos: Vec<GitlabRepo> = response.json().map_err(|e| e.to_string())?;
+    Ok(repos
+        .into_iter()
+        .map(|repo| ProviderRepository {
+            id: repo.id.to_string(),
+            name: repo.name,
+            full_name: repo.path_with_namespace,
+            clone_url: repo.http_url_to_repo,
+            web_url: repo.web_url,
+            private: repo.visibility.as_deref().unwrap_or("private") != "public",
+            provider: "gitlab".to_string(),
+            host: host.to_string(),
+        })
+        .collect())
 }
 

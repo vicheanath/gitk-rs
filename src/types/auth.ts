@@ -20,6 +20,17 @@ export interface AuthConnectionInput {
   scopes?: string[];
 }
 
+export interface ProviderRepository {
+  id: string;
+  name: string;
+  full_name: string;
+  clone_url: string;
+  web_url: string;
+  private: boolean;
+  provider: string;
+  host: string;
+}
+
 export const PROVIDER_PRESETS: Array<{
   provider: GitProvider;
   label: string;
