@@ -19,15 +19,25 @@ Download the latest release from the [GitHub Releases](https://github.com/vichea
 
 ### CLI Setup (Optional)
 
-Add GitK-RS to your command line for quick access from any git repository:
+Add Gitr to your command line for quick access from any git repository:
 
+**macOS / Linux:**
 ```bash
-# 1. Run the CLI setup script
-bash scripts/install-cli.sh
+bash scripts/install-gitr.sh
 
-# 2. Now you can use 'gitkrs' from anywhere:
-cd /path/to/your/repo
-gitkrs
+# Now use from any repo:
+gitr
+```
+
+**Windows (Git Bash):**
+```bash
+bash scripts/install-gitr.sh
+```
+
+**Windows (CMD/PowerShell):**
+Copy `scripts/gitr.bat` to your PATH, then:
+```cmd
+gitr C:\path\to\repo
 ```
 
 For detailed CLI setup instructions, see [CLI_SETUP.md](./CLI_SETUP.md)

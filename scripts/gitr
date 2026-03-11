@@ -1,0 +1,83 @@
+#!/bin/bash
+
+# Gitr - GitK-RS CLI launcher
+# Opens a git repository in GitK-RS
+# Usage: gitr [path]
+
+set -e
+
+# Get the target directory
+TARGET_DIR="${1:-.}"
+
+# Resolve to absolute path
+if [ -d "$TARGET_DIR" ]; then
+    TARGET_DIR=$(cd "$TARGET_DIR" && pwd)
+else
+    echo "❌ Error: Directory '$TARGET_DIR' does not exist"
+    exit 1
+fi
+
+# Check if it's a git repository
+if [ ! -d "$TARGET_DIR/.git" ]; then
+    echo "❌ Error: '$TARGET_DIR' is not a git repository"
+    exit 1
+fi
+
+# Detect OS
+OS_TYPE=$(uname -s)
+
+case "$OS_TYPE" in
+    Darwin)
+        # macOS
+        if [ -d "/Applications/gitk-rs.app" ]; then
+            echo "📂 Opening repository: $TARGET_DIR"
+            open -a "gitk-rs"
+            echo "⏳ GitK-RS is starting..."
+        else
+            echo "❌ Error: GitK-RS is not installed in /Applications/gitk-rs.app"
+            exit 1
+        fi
+        ;;
+    Linux)
+        # Linux - try common desktop locations
+        if command -v gitk-rs &> /dev/null; then
+            echo "📂 Opening repository: $TARGET_DIR"
+            nohup gitk-rs "$TARGET_DIR" > /dev/null 2>&1 &
+            echo "⏳ GitK-RS is starting..."
+        elif [ -x "$HOME/.local/bin/gitk-rs" ]; then
+            echo "📂 Opening repository: $TARGET_DIR"
+            nohup "$HOME/.local/bin/gitk-rs" "$TARGET_DIR" > /dev/null 2>&1 &
+            echo "⏳ GitK-RS is starting..."
+        elif [ -x "/opt/gitk-rs/gitk-rs" ]; then
+            echo "📂 Opening repository: $TARGET_DIR"
+            nohup /opt/gitk-rs/gitk-rs "$TARGET_DIR" > /dev/null 2>&1 &
+            echo "⏳ GitK-RS is starting..."
+        else
+            echo "❌ Error: GitK-RS is not installed"
+            echo "Please install GitK-RS first"
+            exit 1
+        fi
+        ;;
+    MINGW*|MSYS*|CYGWIN*)
+        # Windows (Git Bash/MSYS2)
+        if command -v gitk-rs &> /dev/null; then
+            echo "📂 Opening repository: $TARGET_DIR"
+            gitk-rs "$TARGET_DIR" &
+            echo "⏳ GitK-RS is starting..."
+        elif [ -f "C:\\Program Files\\gitk-rs\\gitk-rs.exe" ]; then
+            echo "📂 Opening repository: $TARGET_DIR"
+            "C:\\Program Files\\gitk-rs\\gitk-rs.exe" "$TARGET_DIR" &
+            echo "⏳ GitK-RS is starting..."
+        else
+            echo "❌ Error: GitK-RS is not installed"
+            echo "Please install GitK-RS first"
+            exit 1
+        fi
+        ;;
+    *)
+        echo "❌ Error: Unsupported operating system: $OS_TYPE"
+        exit 1
+        ;;
+esac
+
+exit 0
