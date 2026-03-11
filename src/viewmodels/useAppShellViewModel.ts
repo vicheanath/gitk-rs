@@ -11,6 +11,9 @@ export function useAppShellViewModel({
   isRepoOpen,
   openRepository,
 }: UseAppShellViewModelProps) {
+  const isTauri =
+    typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
   const getWindowHeight = () =>
     typeof window !== "undefined" ? window.innerHeight : 900;
 
@@ -24,6 +27,12 @@ export function useAppShellViewModel({
     initialSize: 200,
     minSize: 120,
     maxSize: 400,
+  });
+
+  const [sidebarWidth, handleSidebarResize] = useResizable({
+    initialSize: 220,
+    minSize: 180,
+    maxSize: 360,
   });
 
   const [detailsHeight, setDetailsHeight] = useState<number>(() =>
@@ -46,6 +55,11 @@ export function useAppShellViewModel({
   }, [clampDetailsHeight]);
 
   const handleOpenRepo = async () => {
+    if (!isTauri) {
+      alert("Open Repository is only available in the Tauri desktop app.");
+      return;
+    }
+
     try {
       const selected = await open({
         directory: true,
@@ -78,13 +92,7 @@ export function useAppShellViewModel({
 
   useEffect(() => {
     const initRepo = async () => {
-      const isTauri =
-        typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-
       if (!isTauri) {
-        if (!isRepoOpen) {
-          await openRepository("mock-repo");
-        }
         return;
       }
 
@@ -100,9 +108,11 @@ export function useAppShellViewModel({
   }, []);
 
   return {
+    sidebarWidth,
     graphWidth,
     detailsHeight,
     scrollContainerRef,
+    handleSidebarResize,
     handleGraphResize,
     handleDetailsResize,
     handleOpenRepo,

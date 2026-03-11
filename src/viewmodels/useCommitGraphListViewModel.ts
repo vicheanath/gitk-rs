@@ -44,8 +44,7 @@ export function useCommitGraphListViewModel({
       if (nodes.length === 0) return;
 
       if (!isTauri) {
-        const { getMockBranches } = await import("../utils/mockData");
-        setBranches(getMockBranches());
+        setBranches([]);
         return;
       }
 

@@ -9,6 +9,7 @@ import { useAppShellViewModel } from "./viewmodels/useAppShellViewModel";
 import Sidebar from "./components/Sidebar/Sidebar";
 import SearchBar, { SearchBarRef } from "./components/SearchBar";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
+import AppMenu from "./components/AppMenu";
 import "./styles/App.css";
 import "./styles/CommitGraphList.css";
 
@@ -23,14 +24,19 @@ function App() {
     loadingGraph,
     graphError,
     openRepository,
+    loadCommitGraph,
     setSelectedCommit,
+    setSearchQuery,
+    selectPrevCommit,
+    selectNextCommit,
   } = useAppContext();
-  const { setSearchQuery, selectPrevCommit, selectNextCommit } = useAppContext();
 
   const {
+    sidebarWidth,
     graphWidth,
     detailsHeight,
     scrollContainerRef,
+    handleSidebarResize,
     handleGraphResize,
     handleDetailsResize,
     handleOpenRepo,
@@ -47,15 +53,34 @@ function App() {
     onToggleSidebar: () => setSidebarOpen((v) => !v),
   });
 
+  const handleToggleSidebar = () => {
+    setSidebarOpen((value) => !value);
+  };
+
   if (!isRepoOpen) {
     return (
       <div className="app">
         <div className="welcome-screen">
           <h1>GitK-RS</h1>
           <p>A modern Git visualization tool</p>
-          <button onClick={handleOpenRepo} className="primary-button">
-            Open Repository
-          </button>
+          <div className="welcome-actions">
+            <button onClick={handleOpenRepo} className="primary-button">
+              Open Repository
+            </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="secondary-button"
+            >
+              Settings
+            </button>
+          </div>
+          <p className="welcome-hint">
+            Select a local Git working tree to load its history and diffs.
+          </p>
+          <SettingsDialog
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
         </div>
       </div>
     );
@@ -78,10 +103,18 @@ function App() {
           </div>
         )}
         <div className="app-title-actions">
+          <AppMenu
+            sidebarOpen={sidebarOpen}
+            hasRepository={isRepoOpen}
+            onOpenRepository={handleOpenRepo}
+            onReloadGraph={() => void loadCommitGraph()}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onToggleSidebar={handleToggleSidebar}
+          />
           {isRepoOpen && (
             <button
               className="sidebar-toggle-btn"
-              onClick={() => setSidebarOpen((v) => !v)}
+              onClick={handleToggleSidebar}
               title="Toggle Sidebar (b)"
             >
               ☰
@@ -101,10 +134,10 @@ function App() {
       <div className="app-body">
         {sidebarOpen && (
           <>
-            <div className="app-sidebar">
+            <div className="app-sidebar" style={{ width: `${sidebarWidth}px` }}>
               <Sidebar />
             </div>
-            <ResizableDivider direction="vertical" onResize={() => {}} />
+            <ResizableDivider direction="vertical" onResize={handleSidebarResize} />
           </>
         )}
         <div className="app-main">
@@ -116,7 +149,20 @@ function App() {
               </div>
             ) : graphError ? (
               <div className="graph-error">
-                <p>Error loading graph: {graphError}</p>
+                <div className="graph-error-content">
+                  <p>Error loading graph: {graphError}</p>
+                  <div className="graph-error-actions">
+                    <button className="secondary-button" onClick={handleOpenRepo}>
+                      Open Another Repository
+                    </button>
+                    <button
+                      className="primary-button"
+                      onClick={() => void loadCommitGraph()}
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
               </div>
             ) : (
               <>

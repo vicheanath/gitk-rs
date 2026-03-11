@@ -171,6 +171,19 @@ body {
   gap: 1rem;
 }
 
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.welcome-hint {
+  max-width: 460px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .welcome-screen h1 {
   font-size: 3rem;
   font-weight: 700;
@@ -197,6 +210,23 @@ body {
 .primary-button:hover {
   background-color: var(--accent-hover);
   box-shadow: 0 0 0 1px var(--accent);
+}
+
+.secondary-button {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.secondary-button:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--accent);
 }
 
 /* GitK-style Title Bar */
@@ -228,28 +258,83 @@ body {
   gap: 4px;
 }
 
-.titlebar-search {
-  flex: 1;
-  max-width: 420px;
-  margin: 0 0.75rem;
+.app-menu {
+  position: relative;
 }
 
-.sidebar-toggle-btn {
+.app-menu-trigger,
+.sidebar-toggle-btn,
+.settings-btn {
   background: transparent;
   border: 1px solid transparent;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 2px 6px;
-  font-size: 14px;
+  padding: 2px 8px;
+  font-size: 13px;
   border-radius: 3px;
-  line-height: 1;
+  line-height: 1.2;
   transition: background-color 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.sidebar-toggle-btn:hover {
+.app-menu-trigger:hover,
+.sidebar-toggle-btn:hover,
+.settings-btn:hover {
   background-color: var(--bg-tertiary);
   border-color: var(--border-color);
   color: var(--text-primary);
+}
+
+.app-menu-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 220px;
+  padding: 0.375rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 30px var(--shadow);
+  z-index: 40;
+}
+
+.app-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 0.55rem 0.625rem;
+  text-align: left;
+  font-size: 12px;
+}
+
+.app-menu-item:hover:not(:disabled) {
+  background-color: var(--bg-tertiary);
+}
+
+.app-menu-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.app-menu-shortcut {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.app-menu-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 0.25rem 0;
+}
+
+.titlebar-search {
+  flex: 1;
+  max-width: 420px;
+  margin: 0 0.75rem;
 }
 
 .app-title-text {
@@ -459,6 +544,20 @@ body {
 
 .graph-error {
   color: var(--danger);
+}
+
+.graph-error-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+.graph-error-actions {
+  display: flex;
+  gap: 0.75rem;
 }
 
 /* Commit List */

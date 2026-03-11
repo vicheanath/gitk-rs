@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CommitNode, GraphEdge } from "../types/git";
-import { generateMockData } from "../utils/mockData";
 import { useSettings } from "../context/SettingsContext";
 
 const isTauri =
@@ -57,21 +56,12 @@ export function useAppViewModel(): AppViewModel {
 
   const loadCommitGraph = useCallback(async () => {
     if (!isTauri) {
-      setLoadingGraph(true);
-      setGraphError(null);
-
-      setTimeout(() => {
-        const mockData = generateMockData();
-        const limitedNodes = mockData.nodes.slice(0, settings.maxCommits);
-        const limitedNodeIds = new Set(limitedNodes.map((node) => node.id));
-        const limitedEdges = mockData.edges.filter(
-          (edge) => limitedNodeIds.has(edge.from) && limitedNodeIds.has(edge.to)
-        );
-        setNodes(limitedNodes);
-        setEdges(limitedEdges);
-        setLoadingGraph(false);
-        setGraphError(null);
-      }, 100);
+      setLoadingGraph(false);
+      setGraphError(
+        "Repository access is only available in the Tauri desktop app."
+      );
+      setNodes([]);
+      setEdges([]);
       return;
     }
 
@@ -105,9 +95,7 @@ export function useAppViewModel(): AppViewModel {
   const openRepository = useCallback(
     async (path: string) => {
       if (!isTauri) {
-        setRepoPath("mock-repo");
-        setIsRepoOpen(true);
-        await loadCommitGraph();
+        alert("Open Repository is only available in the Tauri desktop app.");
         return;
       }
 
@@ -115,6 +103,8 @@ export function useAppViewModel(): AppViewModel {
         await invoke("open_repository", { path });
         setRepoPath(path);
         setIsRepoOpen(true);
+        setSelectedCommit(null);
+        setSearchQuery("");
         await loadCommitGraph();
       } catch (error) {
         const errorMessage =
