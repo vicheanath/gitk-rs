@@ -1,4 +1,4 @@
-use crate::app_core::AppState;
+use crate::app_core::{AppState, SqliteCache};
 use crate::auth::{self, AuthConnection, AuthConnectionInput};
 use crate::git_engine::operations::{open_repo, BranchInfo, TagInfo, WorkingTreeFile};
 use crate::git_engine::{build_commit_graph, CommitNode};
@@ -7,9 +7,19 @@ use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 
 static APP_STATE: Mutex<Option<Arc<Mutex<AppState>>>> = Mutex::new(None);
+static CACHE: OnceLock<SqliteCache> = OnceLock::new();
+
+fn get_cache() -> &'static SqliteCache {
+    CACHE.get_or_init(|| {
+        SqliteCache::open().unwrap_or_else(|e| {
+            eprintln!("[cache] failed to open SQLite cache: {e}");
+            panic!("unable to open SQLite cache")
+        })
+    })
+}
 
 fn get_repo() -> Result<Repository, String> {
     let state = APP_STATE.lock().unwrap();
@@ -54,12 +64,38 @@ pub fn open_repository(path: String) -> Result<(), String> {
 #[tauri::command]
 pub fn get_commit_graph(max_commits: Option<usize>) -> Result<CommitGraphResponse, String> {
     let repo = get_repo()?;
-    let graph = build_commit_graph(&repo, max_commits.or(Some(1000))).map_err(|e| e.to_string())?;
-    
+    let limit = max_commits.unwrap_or(1000);
+
+    // Resolve HEAD so we can use it as a cache key.
+    let head_oid = repo
+        .head()
+        .ok()
+        .and_then(|h| h.target())
+        .map(|oid| oid.to_string())
+        .unwrap_or_default();
+
+    let repo_path = repo
+        .workdir()
+        .or_else(|| Some(repo.path()))
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let cache = get_cache();
+
+    // Cache hit: deserialise and return immediately.
+    if let Some(json) = cache.get_commit_graph(&repo_path, &head_oid, limit) {
+        if let Ok(response) = serde_json::from_str::<CommitGraphResponse>(&json) {
+            return Ok(response);
+        }
+    }
+
+    // Cache miss: build graph from git history.
+    let graph = build_commit_graph(&repo, Some(limit)).map_err(|e| e.to_string())?;
+
     let nodes: Vec<CommitNode> = graph.graph.node_indices()
         .map(|idx| graph.graph[idx].clone())
         .collect();
-    
+
     let edges: Vec<GraphEdge> = graph.graph.edge_indices()
         .filter_map(|edge| {
             graph.graph.edge_endpoints(edge).map(|(from, to)| GraphEdge {
@@ -68,8 +104,15 @@ pub fn get_commit_graph(max_commits: Option<usize>) -> Result<CommitGraphRespons
             })
         })
         .collect();
-    
-    Ok(CommitGraphResponse { nodes, edges })
+
+    let response = CommitGraphResponse { nodes, edges };
+
+    // Persist to cache (fire-and-forget; serialisation failure is non-fatal).
+    if let Ok(json) = serde_json::to_string(&response) {
+        cache.put_commit_graph(&repo_path, &head_oid, limit, &json);
+    }
+
+    Ok(response)
 }
 
 #[tauri::command]
@@ -86,6 +129,15 @@ pub fn get_tags() -> Result<Vec<TagInfo>, String> {
 
 #[tauri::command]
 pub fn get_commit_details(oid: String) -> Result<CommitDetails, String> {
+    let cache = get_cache();
+
+    // Commits are content-addressed and immutable — cache indefinitely.
+    if let Some(json) = cache.get_commit_details(&oid) {
+        if let Ok(details) = serde_json::from_str::<CommitDetails>(&json) {
+            return Ok(details);
+        }
+    }
+
     let repo = get_repo()?;
     let commit_oid = git2::Oid::from_str(&oid).map_err(|e| e.to_string())?;
     let commit = repo.find_commit(commit_oid).map_err(|e| e.to_string())?;
@@ -162,7 +214,7 @@ pub fn get_commit_details(oid: String) -> Result<CommitDetails, String> {
         }
     }
     
-    Ok(CommitDetails {
+    let details = CommitDetails {
         id: commit.id().to_string(),
         parents: commit.parent_ids().map(|id| id.to_string()).collect(),
         author: author.name().unwrap_or("").to_string(),
@@ -175,7 +227,14 @@ pub fn get_commit_details(oid: String) -> Result<CommitDetails, String> {
         branches,
         follows_tags,
         precedes_tags,
-    })
+    };
+
+    // Store in cache for future calls.
+    if let Ok(json) = serde_json::to_string(&details) {
+        cache.put_commit_details(&oid, &json);
+    }
+
+    Ok(details)
 }
 
 #[tauri::command]
@@ -344,15 +403,25 @@ pub fn get_commit_tree(oid: String) -> Result<Vec<TreeNode>, String> {
 #[tauri::command]
 pub fn checkout_branch(name: String) -> Result<(), String> {
     let repo = get_repo()?;
+
+    let repo_path = repo
+        .workdir()
+        .or_else(|| Some(repo.path()))
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
     crate::git_engine::operations::checkout_branch(&repo, &name).map_err(|e| e.to_string())?;
-    
+
+    // Invalidate the graph cache so the next load reflects the new HEAD.
+    get_cache().invalidate_graph_for_repo(&repo_path);
+
     // Update state
     let state = APP_STATE.lock().unwrap();
     if let Some(state) = state.as_ref() {
         let mut state = state.lock().unwrap();
         state.active_branch = Some(name);
     }
-    
+
     Ok(())
 }
 
@@ -415,7 +484,20 @@ pub fn discard_all() -> Result<(), String> {
 #[tauri::command]
 pub fn commit_staged(message: String) -> Result<String, String> {
     let repo = get_repo()?;
-    crate::git_engine::operations::commit_staged(&repo, &message).map_err(|e| e.to_string())
+
+    let repo_path = repo
+        .workdir()
+        .or_else(|| Some(repo.path()))
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default();
+
+    let new_oid =
+        crate::git_engine::operations::commit_staged(&repo, &message).map_err(|e| e.to_string())?;
+
+    // Invalidate the graph cache — a new commit has moved HEAD.
+    get_cache().invalidate_graph_for_repo(&repo_path);
+
+    Ok(new_oid)
 }
 
 #[tauri::command]
