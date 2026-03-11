@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useAppContext } from "./context/AppContext";
 import CommitGraphList from "./components/CommitGraphList/CommitGraphList";
 import CommitDetails from "./components/CommitDetails/CommitDetails";
@@ -6,6 +6,9 @@ import ResizableDivider from "./components/ResizableDivider/ResizableDivider";
 import SettingsDialog from "./components/Settings/SettingsDialog";
 import ThemeToggle from "./components/ThemeToggle";
 import { useAppShellViewModel } from "./viewmodels/useAppShellViewModel";
+import Sidebar from "./components/Sidebar/Sidebar";
+import SearchBar, { SearchBarRef } from "./components/SearchBar";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import "./styles/App.css";
 import "./styles/CommitGraphList.css";
 
@@ -22,6 +25,7 @@ function App() {
     openRepository,
     setSelectedCommit,
   } = useAppContext();
+  const { setSearchQuery, selectPrevCommit, selectNextCommit } = useAppContext();
 
   const {
     graphWidth,
@@ -33,6 +37,15 @@ function App() {
   } = useAppShellViewModel({ isRepoOpen, openRepository });
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const searchBarRef = useRef<SearchBarRef>(null);
+
+  useKeyboardShortcuts({
+    onArrowUp: selectPrevCommit,
+    onArrowDown: selectNextCommit,
+    onSearch: () => searchBarRef.current?.focus(),
+    onToggleSidebar: () => setSidebarOpen((v) => !v),
+  });
 
   if (!isRepoOpen) {
     return (
@@ -59,7 +72,21 @@ function App() {
             </span>
           )}
         </div>
+        {isRepoOpen && (
+          <div className="titlebar-search">
+            <SearchBar ref={searchBarRef} onSearch={setSearchQuery} />
+          </div>
+        )}
         <div className="app-title-actions">
+          {isRepoOpen && (
+            <button
+              className="sidebar-toggle-btn"
+              onClick={() => setSidebarOpen((v) => !v)}
+              title="Toggle Sidebar (b)"
+            >
+              ☰
+            </button>
+          )}
           <ThemeToggle />
           <button
             className="settings-btn"
@@ -72,6 +99,14 @@ function App() {
       </div>
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <div className="app-body">
+        {sidebarOpen && (
+          <>
+            <div className="app-sidebar">
+              <Sidebar />
+            </div>
+            <ResizableDivider direction="vertical" onResize={() => {}} />
+          </>
+        )}
         <div className="app-main">
           {/* Combined Graph and Commit List in single scroll container */}
           <div ref={scrollContainerRef} className="app-graph-list-container">

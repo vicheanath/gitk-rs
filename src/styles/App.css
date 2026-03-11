@@ -228,6 +228,30 @@ body {
   gap: 4px;
 }
 
+.titlebar-search {
+  flex: 1;
+  max-width: 420px;
+  margin: 0 0.75rem;
+}
+
+.sidebar-toggle-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 14px;
+  border-radius: 3px;
+  line-height: 1;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sidebar-toggle-btn:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
 .app-title-text {
   color: var(--text-primary);
 }
@@ -245,7 +269,9 @@ body {
 }
 
 .app-sidebar {
+  width: 220px;
   min-width: 150px;
+  max-width: 400px;
   border-right: 1px solid var(--border-color);
   background-color: var(--bg-secondary);
   overflow-y: auto;

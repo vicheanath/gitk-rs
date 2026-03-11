@@ -20,6 +20,8 @@ export interface AppViewModel {
   loadCommitGraph: () => Promise<void>;
   setSelectedCommit: (commitId: string | null) => void;
   setSearchQuery: (query: string) => void;
+  selectPrevCommit: () => void;
+  selectNextCommit: () => void;
 }
 
 export function useAppViewModel(): AppViewModel {
@@ -34,6 +36,24 @@ export function useAppViewModel(): AppViewModel {
 
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const selectPrevCommit = useCallback(() => {
+    setSelectedCommit((current) => {
+      if (nodes.length === 0) return current;
+      if (!current) return nodes[0].id;
+      const idx = nodes.findIndex((n) => n.id === current);
+      return idx > 0 ? nodes[idx - 1].id : current;
+    });
+  }, [nodes]);
+
+  const selectNextCommit = useCallback(() => {
+    setSelectedCommit((current) => {
+      if (nodes.length === 0) return current;
+      if (!current) return nodes[0].id;
+      const idx = nodes.findIndex((n) => n.id === current);
+      return idx < nodes.length - 1 ? nodes[idx + 1].id : current;
+    });
+  }, [nodes]);
 
   const loadCommitGraph = useCallback(async () => {
     if (!isTauri) {
@@ -119,6 +139,8 @@ export function useAppViewModel(): AppViewModel {
       loadCommitGraph,
       setSelectedCommit,
       setSearchQuery,
+      selectPrevCommit,
+      selectNextCommit,
     }),
     [
       repoPath,
@@ -131,6 +153,8 @@ export function useAppViewModel(): AppViewModel {
       searchQuery,
       openRepository,
       loadCommitGraph,
+      selectPrevCommit,
+      selectNextCommit,
     ]
   );
 }
