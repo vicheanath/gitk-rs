@@ -38,7 +38,7 @@
     "withGlobalTauri": false
   },
   "bundle": {
-    "active": false
+    "active": true
   }
 }
 

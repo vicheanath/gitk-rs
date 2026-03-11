@@ -1086,6 +1086,77 @@ body {
   flex-wrap: wrap;
 }
 
+.copy-sha-btn {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+}
+
+.copy-sha-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.copy-sha-btn.copied {
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.copy-sha-btn.failed {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.commit-summary-card {
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  padding: 0.45rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.commit-summary-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 0.55rem;
+  align-items: start;
+}
+
+.summary-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.summary-value {
+  color: var(--text-primary);
+  font-size: 11px;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.sha-full {
+  font-family: "Courier New", "Consolas", monospace;
+}
+
+.message-row {
+  margin-top: 0.1rem;
+}
+
+.commit-message-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: "Courier New", "Consolas", monospace;
+  line-height: 1.35;
+}
+
 .commit-id-label {
   font-weight: 600;
   color: var(--text-secondary);

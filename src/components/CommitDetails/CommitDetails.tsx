@@ -1,3 +1,4 @@
+import { useState } from "react";
 import FileList from "./FileList";
 import DiffViewer from "./DiffViewer";
 import TreeView from "./TreeView";
@@ -14,6 +15,10 @@ export default function CommitDetails({
   commitId,
   nodes = [],
 }: CommitDetailsProps) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
+    "idle"
+  );
+
   const {
     details,
     loading,
@@ -62,6 +67,30 @@ export default function CommitDetails({
     );
   }
 
+  const handleCopySha = async () => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(details.id);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = details.id;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+
+      setCopyState("copied");
+      window.setTimeout(() => setCopyState("idle"), 1400);
+    } catch {
+      setCopyState("failed");
+      window.setTimeout(() => setCopyState("idle"), 1800);
+    }
+  };
+
   return (
     <div className="commit-details classic-gitk github-commit-detail">
       <div className="commit-details-top github-detail-header">
@@ -69,6 +98,18 @@ export default function CommitDetails({
           <span className="commit-id-label">Commit</span>
           <span className="commit-hash">{details.id.substring(0, 8)}</span>
           <span className="commit-row-info">{rowNumber}/{totalCommits}</span>
+          <button
+            type="button"
+            className={`copy-sha-btn ${copyState}`}
+            onClick={handleCopySha}
+            title="Copy full commit SHA"
+          >
+            {copyState === "copied"
+              ? "Copied"
+              : copyState === "failed"
+                ? "Copy failed"
+                : "Copy SHA"}
+          </button>
         </div>
         <div className="github-detail-meta">
           <span>{details.author}</span>
@@ -77,6 +118,27 @@ export default function CommitDetails({
           <span className="meta-dot">•</span>
           <span className="stat-additions">+{fileStats.additions}</span>
           <span className="stat-deletions">-{fileStats.deletions}</span>
+        </div>
+      </div>
+
+      <div className="commit-summary-card">
+        <div className="commit-summary-row">
+          <span className="summary-label">SHA</span>
+          <code className="summary-value sha-full">{details.id}</code>
+        </div>
+        <div className="commit-summary-row">
+          <span className="summary-label">Author</span>
+          <span className="summary-value">{details.author} &lt;{details.email}&gt;</span>
+        </div>
+        <div className="commit-summary-row">
+          <span className="summary-label">Committer</span>
+          <span className="summary-value">
+            {details.committer} &lt;{details.committer_email}&gt;
+          </span>
+        </div>
+        <div className="commit-summary-row message-row">
+          <span className="summary-label">Message</span>
+          <pre className="summary-value commit-message-pre">{details.message}</pre>
         </div>
       </div>
 
