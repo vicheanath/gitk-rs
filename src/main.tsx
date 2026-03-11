@@ -4,6 +4,7 @@ import App from "./App";
 import { AppProvider } from "./context/AppContext";
 import { SettingsProvider } from "./context/SettingsContext";
 import { loadSettings } from "./types/settings";
+import "./styles/tailwind.css";
 import "./styles/App.css";
 
 // Apply persisted theme immediately so there's no flash on load.

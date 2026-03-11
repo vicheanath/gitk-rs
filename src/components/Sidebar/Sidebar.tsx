@@ -9,12 +9,20 @@ type TabType = "sourceControl" | "branches" | "tags";
 export default function Sidebar() {
   const [activeTab, setActiveTab] = useState<TabType>("sourceControl");
 
+  const tabClass = (isActive: boolean) =>
+    [
+      "inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] font-medium transition",
+      isActive
+        ? "border-[color-mix(in_srgb,var(--accent)_45%,var(--border-color))] bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+        : "border-transparent text-[var(--text-secondary)] hover:border-[var(--border-color)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]",
+    ].join(" ");
+
   return (
-    <div className="sidebar">
-      <div className="sidebar-tabs" role="tablist" aria-label="Sidebar Sections">
+    <div className="flex h-full flex-col bg-[var(--bg-secondary)]">
+      <div className="flex items-center gap-1 border-b border-[var(--border-color)] p-2" role="tablist" aria-label="Sidebar Sections">
         <button
           type="button"
-          className={activeTab === "sourceControl" ? "active" : ""}
+          className={tabClass(activeTab === "sourceControl")}
           onClick={() => setActiveTab("sourceControl")}
           role="tab"
           aria-selected={activeTab === "sourceControl"}
@@ -24,7 +32,7 @@ export default function Sidebar() {
         </button>
         <button
           type="button"
-          className={activeTab === "branches" ? "active" : ""}
+          className={tabClass(activeTab === "branches")}
           onClick={() => setActiveTab("branches")}
           role="tab"
           aria-selected={activeTab === "branches"}
@@ -34,7 +42,7 @@ export default function Sidebar() {
         </button>
         <button
           type="button"
-          className={activeTab === "tags" ? "active" : ""}
+          className={tabClass(activeTab === "tags")}
           onClick={() => setActiveTab("tags")}
           role="tab"
           aria-selected={activeTab === "tags"}
@@ -43,7 +51,7 @@ export default function Sidebar() {
           Tags
         </button>
       </div>
-      <div className="sidebar-content">
+      <div className="min-h-0 flex-1 overflow-auto p-2">
         {activeTab === "sourceControl" && <ChangesPanel />}
         {activeTab === "branches" && <BranchList />}
         {activeTab === "tags" && <TagList />}

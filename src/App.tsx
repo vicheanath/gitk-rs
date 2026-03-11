@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import {
   FolderGit2,
   GitCommitHorizontal,
@@ -8,6 +9,7 @@ import {
   Settings2,
   X,
 } from "lucide-react";
+import { AuthConnection } from "./types/auth";
 import { useAppContext } from "./context/AppContext";
 import CommitGraphList from "./components/CommitGraphList/CommitGraphList";
 import CommitDetails from "./components/CommitDetails/CommitDetails";
@@ -49,12 +51,13 @@ function App() {
     handleSidebarResize,
     handleGraphResize,
     handleOpenRepo,
-  } = useAppShellViewModel({ isRepoOpen, openRepository });
+  } = useAppShellViewModel({ openRepository });
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [connections, setConnections] = useState<AuthConnection[]>([]);
   const searchBarRef = useRef<SearchBarRef>(null);
 
   const { openTabs, activeTab, selectCommitFromGraph, activateTab, closeTab } =
@@ -74,6 +77,16 @@ function App() {
   const handleToggleSidebar = () => {
     setSidebarOpen((value) => !value);
   };
+
+  useEffect(() => {
+    const isTauri =
+      typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    if (!isTauri) return;
+
+    void invoke<AuthConnection[]>("list_git_auth_connections")
+      .then((result) => setConnections(result))
+      .catch(() => setConnections([]));
+  }, [settingsOpen]);
 
   useEffect(() => {
     const isTauri =
@@ -126,27 +139,66 @@ function App() {
   if (!isRepoOpen) {
     return (
       <div className="app">
-        <div className="welcome-screen">
-          <h1>GitK-RS</h1>
-          <p>A modern Git visualization tool</p>
-          <div className="welcome-actions">
-            <button onClick={handleOpenRepo} className="primary-button">
-              Open Repository
-            </button>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="secondary-button"
-            >
-              Settings
-            </button>
+        <div className="min-h-screen w-full bg-[var(--bg-primary)] text-[var(--text-primary)]">
+          <div className="mx-auto flex h-full max-w-4xl flex-col gap-6 px-6 py-14">
+            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-6 shadow-lg">
+              <div className="mb-5 flex items-center gap-3">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--bg-tertiary)] text-[var(--accent)]">
+                  <FolderGit2 size={20} />
+                </span>
+                <div>
+                  <h1 className="text-2xl font-semibold tracking-tight">GitK-RS</h1>
+                  <p className="text-sm text-[var(--text-secondary)]">A modern Git visualization tool</p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button onClick={handleOpenRepo} className="primary-button">
+                  Open Repository
+                </button>
+                <button
+                  onClick={() => setSettingsOpen(true)}
+                  className="secondary-button"
+                >
+                  Settings
+                </button>
+              </div>
+
+              <p className="mt-4 text-xs text-[var(--text-secondary)]">
+                Repository dialog will only open when you click <strong>Open Repository</strong>.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] p-5">
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+                Connected Providers
+              </h2>
+              {connections.length === 0 ? (
+                <p className="text-sm text-[var(--text-secondary)]">
+                  No providers connected yet. Add accounts in Settings to manage GitHub, GitLab, Bitbucket, and Azure DevOps.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {connections.map((connection) => (
+                    <div
+                      key={connection.id}
+                      className="rounded-lg border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2"
+                    >
+                      <p className="text-sm font-semibold">{connection.display_name}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">
+                        {connection.provider} • {connection.host}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <SettingsDialog
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+            />
           </div>
-          <p className="welcome-hint">
-            Select a local Git working tree to load its history and diffs.
-          </p>
-          <SettingsDialog
-            open={settingsOpen}
-            onClose={() => setSettingsOpen(false)}
-          />
         </div>
       </div>
     );
@@ -154,32 +206,32 @@ function App() {
 
   return (
     <div className="app gitk-layout">
-      <div className="app-titlebar">
-        <div className="app-titlebar-left">
-          <div className="app-product-pill" aria-label="GitK-RS">
+      <div className="flex min-h-9 items-center gap-2 border-b border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-secondary)_94%,#000000_6%)] px-2.5 py-1 text-xs font-medium">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="inline-flex shrink-0 items-center gap-1 rounded border border-[color-mix(in_srgb,var(--border-color)_88%,#ffffff_12%)] bg-[color-mix(in_srgb,var(--bg-primary)_82%,#ffffff_18%)] px-2 py-1 text-[var(--text-primary)]" aria-label="GitK-RS">
             <FolderGit2 size={14} />
-            <span className="app-title-text">GitK-RS</span>
+            <span className="font-semibold">GitK-RS</span>
           </div>
           {isRepoOpen && (
-            <div className="app-title-breadcrumbs">
-              <span className="app-title-crumb-label">Repository</span>
-              <span className="app-repo-name">
+            <div className="inline-flex min-w-0 items-center gap-1 text-[var(--text-secondary)]">
+              <span className="text-[11px] uppercase tracking-wide max-[900px]:hidden">Repository</span>
+              <span className="truncate text-xs font-medium text-[var(--text-primary)]">
                 {repoPath?.split("/").pop() || "Repository"}
               </span>
             </div>
           )}
         </div>
         {isRepoOpen && (
-          <div className="app-titlebar-center">
-            <div className="titlebar-search">
+          <div className="flex min-w-[220px] flex-[0_1_560px] justify-center max-[680px]:min-w-0 max-[680px]:flex-1">
+            <div className="m-0 w-full max-w-[540px]">
               <SearchBar ref={searchBarRef} onSearch={setSearchQuery} />
             </div>
           </div>
         )}
-        <div className="app-title-actions" role="toolbar" aria-label="Window actions">
+        <div className="ml-auto inline-flex items-center gap-1" role="toolbar" aria-label="Window actions">
           {isRepoOpen && (
             <button
-              className="sidebar-toggle-btn"
+              className="inline-flex h-6 w-7 items-center justify-center rounded border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_86%,transparent)] text-[var(--text-secondary)] transition hover:border-[color-mix(in_srgb,var(--accent)_34%,var(--border-color))] hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_78%,#ffffff_22%)] hover:text-[var(--text-primary)]"
               onClick={handleToggleSidebar}
               title="Toggle Sidebar (b)"
             >
@@ -187,7 +239,7 @@ function App() {
             </button>
           )}
           <button
-            className="settings-btn settings-btn-wide"
+            className="inline-flex h-6 items-center gap-1 rounded border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_86%,transparent)] px-2 text-xs text-[var(--text-secondary)] transition hover:border-[color-mix(in_srgb,var(--accent)_34%,var(--border-color))] hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_78%,#ffffff_22%)] hover:text-[var(--text-primary)]"
             onClick={() => setSettingsOpen(true)}
             title="Settings"
           >

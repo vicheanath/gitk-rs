@@ -127,13 +127,28 @@ function statusTone(file: WorkingTreeFile, section: SectionKind): string {
 }
 
 function classifyDiffLine(line: string): string {
-  if (line.startsWith("diff --git")) return "line-kind-diff-file-header";
-  if (line.startsWith("index ")) return "line-kind-diff-index";
-  if (line.startsWith("@@")) return "line-kind-diff-hunk";
-  if (line.startsWith("---") || line.startsWith("+++")) return "line-kind-diff-meta";
-  if (line.startsWith("+") && !line.startsWith("+++")) return "diff-add";
-  if (line.startsWith("-") && !line.startsWith("---")) return "diff-remove";
+  if (line.startsWith("diff --git")) return "text-(--accent-primary)";
+  if (line.startsWith("index ")) return "text-(--text-muted)";
+  if (line.startsWith("@@")) return "text-(--warning)";
+  if (line.startsWith("---") || line.startsWith("+++")) return "text-(--text-secondary)";
+  if (line.startsWith("+") && !line.startsWith("+++")) return "text-(--success)";
+  if (line.startsWith("-") && !line.startsWith("---")) return "text-(--danger)";
   return "";
+}
+
+function statusToneClass(tone: string): string {
+  switch (tone) {
+    case "conflict":
+      return "text-(--danger)";
+    case "deleted":
+      return "text-(--danger)";
+    case "modified":
+      return "text-(--warning)";
+    case "renamed":
+      return "text-(--accent-primary)";
+    default:
+      return "text-(--success)";
+  }
 }
 
 function countFilesInNode(node: ChangeNode): number {
@@ -335,25 +350,35 @@ export default function ChangesPanel() {
     return (
       <li
         key={`${section}:${file.path}`}
-        className={`changes-row changes-row-file ${selected ? "selected" : ""}`.trim()}
+        className={`group flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-(--bg-secondary) ${
+          selected ? "bg-(--bg-secondary)" : ""
+        }`}
         style={compactPath ? { paddingLeft: `${level * 14 + 8}px` } : undefined}
         onClick={() => setSelectedChange({ path: file.path, section })}
       >
-        <div className="changes-row-main">
-          <span className={`changes-status-mark ${tone}`}>{formatStatus(file, section)}</span>
-          <span className="changes-file-icon"><FileCode2 size={12} /></span>
-          <div className="changes-file-text">
-            <span className="changes-file-name" title={file.path}>{compactPath ? fileName : file.path}</span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className={`w-3 text-center font-mono text-[10px] font-semibold ${statusToneClass(tone)}`}>
+            {formatStatus(file, section)}
+          </span>
+          <span className="inline-flex h-3 w-3 items-center justify-center text-(--text-muted)">
+            <FileCode2 size={12} />
+          </span>
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-(--text-primary)" title={file.path}>
+              {compactPath ? fileName : file.path}
+            </span>
             {compactPath && pathSuffix ? (
-              <span className="changes-file-meta" title={pathSuffix}>{pathSuffix}</span>
+              <span className="truncate text-[10px] text-(--text-muted)" title={pathSuffix}>
+                {pathSuffix}
+              </span>
             ) : null}
           </div>
         </div>
-        <div className="changes-row-actions">
+        <div className="flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
           {section === "staged" ? (
             <button
               type="button"
-              className="changes-icon-btn"
+              className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
               onClick={(event) => {
                 event.stopPropagation();
                 void runAction(() => invoke("unstage_paths", { paths: [file.path] }));
@@ -367,7 +392,7 @@ export default function ChangesPanel() {
             <>
               <button
                 type="button"
-                className="changes-icon-btn"
+                className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={(event) => {
                   event.stopPropagation();
                   void runAction(() => invoke("discard_paths", { paths: [file.path] }));
@@ -379,7 +404,7 @@ export default function ChangesPanel() {
               </button>
               <button
                 type="button"
-                className="changes-icon-btn"
+                className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={(event) => {
                   event.stopPropagation();
                   void runAction(() => invoke("stage_paths", { paths: [file.path] }));
@@ -408,29 +433,36 @@ export default function ChangesPanel() {
       : "";
 
     return (
-      <li key={node.path} className="changes-tree-node">
+      <li key={node.path} className="space-y-1">
         <button
           type="button"
-          className="changes-folder-row"
+          className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-xs text-(--text-secondary) transition-colors hover:bg-(--bg-secondary)"
           style={{ paddingLeft: `${level * 14 + 8}px` }}
           onClick={() => toggleFolder(node.path)}
         >
-          <span className="changes-folder-chevron">
+          <span className="inline-flex h-3 w-3 items-center justify-center text-(--text-muted)">
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </span>
-          <span className="changes-folder-icon"><Folder size={12} /></span>
-          <span className="changes-folder-text">
-            <span className="changes-folder-name" title={node.path}>{node.name}</span>
+          <span className="inline-flex h-3 w-3 items-center justify-center text-(--text-muted)"><Folder size={12} /></span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate font-medium text-(--text-secondary)" title={node.path}>
+              {node.name}
+            </span>
             {folderPathMeta ? (
-              <span className="changes-folder-meta" title={folderPathMeta}>{folderPathMeta}</span>
+              <span className="truncate text-[10px] text-(--text-muted)" title={folderPathMeta}>
+                {folderPathMeta}
+              </span>
             ) : null}
           </span>
-          <span className="changes-folder-count" title={`${folderFileCount} file${folderFileCount > 1 ? "s" : ""}`}>
+          <span
+            className="rounded border border-(--border-primary) px-1 py-0.5 text-[10px] text-(--text-muted)"
+            title={`${folderFileCount} file${folderFileCount > 1 ? "s" : ""}`}
+          >
             {folderFileCount}
           </span>
         </button>
         {expanded ? (
-          <ul className="changes-tree-list">
+          <ul className="space-y-1">
             {node.children.map((child) => renderTreeNode(child, level + 1))}
           </ul>
         ) : null}
@@ -439,18 +471,22 @@ export default function ChangesPanel() {
   };
 
   return (
-    <div className="changes-panel vscode-scm-panel">
-      <div className="changes-header-row">
+    <div className="space-y-3 px-2 pb-3">
+      <div className="flex items-start justify-between gap-2">
         <div>
-          <h3>Changes</h3>
-          <span className="changes-summary">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-(--text-secondary)">
+            Changes
+          </h3>
+          <span className="text-[10px] text-(--text-muted)">
             {stagedFiles.length} staged, {unstagedFiles.length} unstaged
           </span>
         </div>
-        <div className="changes-toolbar">
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            className={`changes-icon-btn ${viewMode === "tree" ? "active" : ""}`}
+            className={`inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) ${
+              viewMode === "tree" ? "ring-1 ring-(--accent-primary)" : ""
+            }`}
             onClick={() => setViewMode("tree")}
             title="Tree view"
           >
@@ -458,7 +494,9 @@ export default function ChangesPanel() {
           </button>
           <button
             type="button"
-            className={`changes-icon-btn ${viewMode === "list" ? "active" : ""}`}
+            className={`inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) ${
+              viewMode === "list" ? "ring-1 ring-(--accent-primary)" : ""
+            }`}
             onClick={() => setViewMode("list")}
             title="List view"
           >
@@ -466,7 +504,7 @@ export default function ChangesPanel() {
           </button>
           <button
             type="button"
-            className="changes-icon-btn"
+            className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => void refreshAll()}
             disabled={busy}
             title="Refresh"
@@ -476,9 +514,9 @@ export default function ChangesPanel() {
         </div>
       </div>
 
-      <div className="changes-commit-box compact">
+      <div className="space-y-2 rounded border border-(--border-primary) bg-(--bg-secondary) p-2">
         <textarea
-          className="changes-commit-input compact"
+          className="w-full resize-y rounded border border-(--border-primary) bg-(--bg-primary) px-2 py-1.5 text-xs text-(--text-primary) outline-none placeholder:text-(--text-muted) focus:ring-1 focus:ring-(--accent-primary)"
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="Message"
@@ -486,7 +524,7 @@ export default function ChangesPanel() {
         />
         <button
           type="button"
-          className="changes-commit-btn compact"
+          className="inline-flex h-7 items-center justify-center gap-1 rounded border border-(--border-primary) bg-(--bg-tertiary) px-2 text-xs font-medium text-(--text-primary) transition-colors hover:bg-(--bg-primary) disabled:cursor-not-allowed disabled:opacity-50"
           onClick={() => void handleCommit()}
           disabled={busy || stagedFiles.length === 0 || !message.trim()}
         >
@@ -495,29 +533,33 @@ export default function ChangesPanel() {
         </button>
       </div>
 
-      {error ? <div className="sidebar-state error">{error}</div> : null}
+      {error ? <div className="rounded border border-(--danger)/40 bg-(--danger)/10 px-2 py-1 text-xs text-(--danger)">{error}</div> : null}
 
       {loading ? (
-        <div className="sidebar-state">Loading changes...</div>
+        <div className="px-2 py-4 text-xs text-(--text-secondary)">Loading changes...</div>
       ) : files.length === 0 ? (
-        <div className="sidebar-state">Working tree clean</div>
+        <div className="rounded border border-dashed border-(--border-primary) px-3 py-4 text-xs text-(--text-secondary)">
+          Working tree clean
+        </div>
       ) : (
         <>
-          <section className="changes-section compact">
-            <div className="changes-section-header">
+          <section className="space-y-2 rounded border border-(--border-primary) bg-(--bg-secondary) p-2">
+            <div className="flex items-center justify-between gap-2">
               <button
                 type="button"
-                className="changes-section-toggle"
+                className="inline-flex min-w-0 items-center gap-1 text-xs text-(--text-secondary)"
                 onClick={() => toggleSection("staged")}
               >
                 {expandedSections.staged ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                <span className="changes-section-title">Staged Changes</span>
-                <span className="changes-count">{stagedFiles.length}</span>
+                <span className="truncate font-medium">Staged Changes</span>
+                <span className="rounded border border-(--border-primary) px-1 py-0.5 text-[10px] text-(--text-muted)">
+                  {stagedFiles.length}
+                </span>
               </button>
-              <div className="changes-section-actions">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  className="changes-icon-btn"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => void runAction(() => invoke("unstage_all"))}
                   disabled={busy || stagedFiles.length === 0}
                   title="Unstage all"
@@ -527,29 +569,31 @@ export default function ChangesPanel() {
               </div>
             </div>
             {!expandedSections.staged ? null : stagedFiles.length === 0 ? (
-              <div className="changes-empty">No staged files</div>
+              <div className="px-2 py-1 text-xs text-(--text-muted)">No staged files</div>
             ) : (
-              <ul className="changes-list compact">
+              <ul className="space-y-1">
                 {stagedFiles.map((file) => renderFileRow(file, "staged", false))}
               </ul>
             )}
           </section>
 
-          <section className="changes-section compact">
-            <div className="changes-section-header">
+          <section className="space-y-2 rounded border border-(--border-primary) bg-(--bg-secondary) p-2">
+            <div className="flex items-center justify-between gap-2">
               <button
                 type="button"
-                className="changes-section-toggle"
+                className="inline-flex min-w-0 items-center gap-1 text-xs text-(--text-secondary)"
                 onClick={() => toggleSection("unstaged")}
               >
                 {expandedSections.unstaged ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                <span className="changes-section-title">Changes</span>
-                <span className="changes-count">{unstagedFiles.length}</span>
+                <span className="truncate font-medium">Changes</span>
+                <span className="rounded border border-(--border-primary) px-1 py-0.5 text-[10px] text-(--text-muted)">
+                  {unstagedFiles.length}
+                </span>
               </button>
-              <div className="changes-section-actions">
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  className="changes-icon-btn"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => void runAction(() => invoke("stage_all"))}
                   disabled={busy || unstagedFiles.length === 0}
                   title="Stage all"
@@ -558,7 +602,7 @@ export default function ChangesPanel() {
                 </button>
                 <button
                   type="button"
-                  className="changes-icon-btn"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => void runAction(() => invoke("discard_all"))}
                   disabled={busy || unstagedFiles.length === 0}
                   title="Discard all"
@@ -568,46 +612,46 @@ export default function ChangesPanel() {
               </div>
             </div>
             {!expandedSections.unstaged ? null : unstagedFiles.length === 0 ? (
-              <div className="changes-empty">No unstaged files</div>
+              <div className="px-2 py-1 text-xs text-(--text-muted)">No unstaged files</div>
             ) : viewMode === "tree" ? (
-              <ul className="changes-list compact">
+              <ul className="space-y-1">
                 {unstagedTree.map((node) => renderTreeNode(node))}
               </ul>
             ) : (
-              <ul className="changes-list compact">
+              <ul className="space-y-1">
                 {unstagedFiles.map((file) => renderFileRow(file, "unstaged", false))}
               </ul>
             )}
           </section>
 
-          <section className="changes-preview">
-            <div className="changes-preview-header">
+          <section className="overflow-hidden rounded border border-(--border-primary) bg-(--bg-secondary)">
+            <div className="border-b border-(--border-primary) px-2 py-1.5">
               <div>
-                <div className="changes-preview-title">Diff Preview</div>
-                <div className="changes-preview-meta">
+                <div className="text-xs font-medium text-(--text-primary)">Diff Preview</div>
+                <div className="truncate text-[10px] text-(--text-muted)">
                   {selectedChange
                     ? `${selectedChange.section === "staged" ? "Staged" : "Working Tree"} • ${selectedChange.path}`
                     : "Select a file to preview changes"}
                 </div>
               </div>
             </div>
-            <div className="changes-preview-body diff-content-simple">
-              {diffLoading ? <p>Loading diff...</p> : null}
-              {!diffLoading && diffError ? <p className="changes-preview-error">{diffError}</p> : null}
+            <div className="max-h-64 overflow-auto bg-(--bg-primary) p-2 font-mono text-[11px] leading-5 text-(--text-secondary)">
+              {diffLoading ? <p className="text-(--text-secondary)">Loading diff...</p> : null}
+              {!diffLoading && diffError ? <p className="text-(--danger)">{diffError}</p> : null}
               {!diffLoading && !diffError && !selectedChange ? (
-                <p>Select a file to preview changes</p>
+                <p className="text-(--text-muted)">Select a file to preview changes</p>
               ) : null}
               {!diffLoading && !diffError && selectedChange && diffText.trim().length === 0 ? (
-                <p>No diff content available</p>
+                <p className="text-(--text-muted)">No diff content available</p>
               ) : null}
               {!diffLoading && !diffError && diffText.trim().length > 0 ? (
-                <div className="diff-simple-viewer changes-preview-diff">
+                <div>
                   {diffText.split("\n").map((line, index) => {
                     const lineClass = classifyDiffLine(line);
                     return (
                       <div
                         key={`${selectedChange?.section ?? "none"}:${selectedChange?.path ?? "none"}:${index}`}
-                        className={`diff-simple-line ${lineClass}`.trim()}
+                        className={`whitespace-pre-wrap break-words ${lineClass}`.trim()}
                       >
                         {line}
                       </div>

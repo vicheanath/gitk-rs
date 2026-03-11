@@ -47,8 +47,8 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
     };
 
     return (
-      <div className="search-bar classic-gitk">
-        <span className="search-icon">
+      <div className="relative flex min-h-7 flex-1 items-center rounded-md border border-[color-mix(in_srgb,var(--border-color)_86%,#ffffff_14%)] bg-[color-mix(in_srgb,var(--bg-primary)_92%,#000000_8%)]">
+        <span className="pointer-events-none absolute left-2 inline-flex items-center justify-center text-[var(--text-secondary)]">
           <Search size={14} />
         </span>
         <input
@@ -57,11 +57,11 @@ const SearchBar = forwardRef<SearchBarRef, SearchBarProps>(
           placeholder="Search commits (message, author, hash)..."
           value={query}
           onChange={handleChange}
-          className="search-input"
+          className="min-h-7 w-full rounded-md bg-transparent py-1 pl-7 pr-8 text-xs text-[var(--text-primary)] outline-none focus:shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_52%,transparent)]"
         />
         {query && (
           <button
-            className="search-clear"
+            className="absolute right-1 inline-flex h-5 w-5 items-center justify-center rounded text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
             onClick={() => setQuery("")}
             title="Clear search"
           >

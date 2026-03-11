@@ -3,12 +3,10 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useResizable } from "../hooks/useResizable";
 
 interface UseAppShellViewModelProps {
-  isRepoOpen: boolean;
   openRepository: (path: string) => Promise<void>;
 }
 
 export function useAppShellViewModel({
-  isRepoOpen,
   openRepository,
 }: UseAppShellViewModelProps) {
   const isTauri =
@@ -89,23 +87,6 @@ export function useAppShellViewModel({
       }
     }
   };
-
-  useEffect(() => {
-    const initRepo = async () => {
-      if (!isTauri) {
-        return;
-      }
-
-      setTimeout(async () => {
-        if (!isRepoOpen) {
-          await handleOpenRepo();
-        }
-      }, 100);
-    };
-
-    initRepo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   return {
     sidebarWidth,
