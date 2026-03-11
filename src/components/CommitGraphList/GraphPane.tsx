@@ -9,6 +9,36 @@ const MERGE_NODE_RADIUS = 7;
 const EDGE_STROKE_WIDTH = 2;
 type BranchHead = { name: string; commit_id: string };
 
+function buildConnectionPath(
+  fromX: number,
+  fromY: number,
+  toX: number,
+  toY: number
+) {
+  const deltaY = toY - fromY;
+  const directionY = deltaY >= 0 ? 1 : -1;
+  const absDeltaY = Math.abs(deltaY);
+
+  if (absDeltaY <= ROW_HEIGHT * 1.25) {
+    const controlY = fromY + deltaY * 0.5;
+    return `M ${fromX} ${fromY} C ${fromX} ${controlY}, ${toX} ${controlY}, ${toX} ${toY}`;
+  }
+
+  const stem = Math.min(Math.max(absDeltaY * 0.22, 8), ROW_HEIGHT * 1.35);
+  const startCurveY = fromY + stem * directionY;
+  const endCurveY = toY - stem * directionY;
+  const curveSpan = endCurveY - startCurveY;
+  const controlY1 = startCurveY + curveSpan * 0.35;
+  const controlY2 = startCurveY + curveSpan * 0.65;
+
+  return [
+    `M ${fromX} ${fromY}`,
+    `L ${fromX} ${startCurveY}`,
+    `C ${fromX} ${controlY1}, ${toX} ${controlY2}, ${toX} ${endCurveY}`,
+    `L ${toX} ${toY}`,
+  ].join(" ");
+}
+
 interface GraphPaneProps {
   filteredNodes: CommitNode[];
   positions: Map<string, NodePosition>;
@@ -150,8 +180,12 @@ export default function GraphPane({
           })}
 
         {horizontalConnections.map((conn) => {
-          const controlY = (conn.fromY + conn.toY) / 2;
-          const path = `M ${conn.fromX} ${conn.fromY} C ${conn.fromX} ${controlY}, ${conn.toX} ${controlY}, ${conn.toX} ${conn.toY}`;
+          const path = buildConnectionPath(
+            conn.fromX,
+            conn.fromY,
+            conn.toX,
+            conn.toY
+          );
           return (
             <path
               key={conn.key}

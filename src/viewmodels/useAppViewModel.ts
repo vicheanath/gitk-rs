@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CommitNode, GraphEdge } from "../types/git";
-import { generateMockData } from "../utils/mockData";
 import { useSettings } from "../context/SettingsContext";
 
 const isTauri =
@@ -17,9 +16,12 @@ export interface AppViewModel {
   selectedCommit: string | null;
   searchQuery: string;
   openRepository: (path: string) => Promise<void>;
+  closeRepository: () => void;
   loadCommitGraph: () => Promise<void>;
   setSelectedCommit: (commitId: string | null) => void;
   setSearchQuery: (query: string) => void;
+  selectPrevCommit: () => void;
+  selectNextCommit: () => void;
 }
 
 export function useAppViewModel(): AppViewModel {
@@ -35,23 +37,32 @@ export function useAppViewModel(): AppViewModel {
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const selectPrevCommit = useCallback(() => {
+    setSelectedCommit((current) => {
+      if (nodes.length === 0) return current;
+      if (!current) return nodes[0].id;
+      const idx = nodes.findIndex((n) => n.id === current);
+      return idx > 0 ? nodes[idx - 1].id : current;
+    });
+  }, [nodes]);
+
+  const selectNextCommit = useCallback(() => {
+    setSelectedCommit((current) => {
+      if (nodes.length === 0) return current;
+      if (!current) return nodes[0].id;
+      const idx = nodes.findIndex((n) => n.id === current);
+      return idx < nodes.length - 1 ? nodes[idx + 1].id : current;
+    });
+  }, [nodes]);
+
   const loadCommitGraph = useCallback(async () => {
     if (!isTauri) {
-      setLoadingGraph(true);
-      setGraphError(null);
-
-      setTimeout(() => {
-        const mockData = generateMockData();
-        const limitedNodes = mockData.nodes.slice(0, settings.maxCommits);
-        const limitedNodeIds = new Set(limitedNodes.map((node) => node.id));
-        const limitedEdges = mockData.edges.filter(
-          (edge) => limitedNodeIds.has(edge.from) && limitedNodeIds.has(edge.to)
-        );
-        setNodes(limitedNodes);
-        setEdges(limitedEdges);
-        setLoadingGraph(false);
-        setGraphError(null);
-      }, 100);
+      setLoadingGraph(false);
+      setGraphError(
+        "Repository access is only available in the Tauri desktop app."
+      );
+      setNodes([]);
+      setEdges([]);
       return;
     }
 
@@ -85,9 +96,7 @@ export function useAppViewModel(): AppViewModel {
   const openRepository = useCallback(
     async (path: string) => {
       if (!isTauri) {
-        setRepoPath("mock-repo");
-        setIsRepoOpen(true);
-        await loadCommitGraph();
+        alert("Open Repository is only available in the Tauri desktop app.");
         return;
       }
 
@@ -95,6 +104,8 @@ export function useAppViewModel(): AppViewModel {
         await invoke("open_repository", { path });
         setRepoPath(path);
         setIsRepoOpen(true);
+        setSelectedCommit(null);
+        setSearchQuery("");
         await loadCommitGraph();
       } catch (error) {
         const errorMessage =
@@ -104,6 +115,17 @@ export function useAppViewModel(): AppViewModel {
     },
     [loadCommitGraph]
   );
+
+  const closeRepository = useCallback(() => {
+    setRepoPath(null);
+    setIsRepoOpen(false);
+    setNodes([]);
+    setEdges([]);
+    setLoadingGraph(false);
+    setGraphError(null);
+    setSelectedCommit(null);
+    setSearchQuery("");
+  }, []);
 
   return useMemo(
     () => ({
@@ -116,9 +138,12 @@ export function useAppViewModel(): AppViewModel {
       selectedCommit,
       searchQuery,
       openRepository,
+      closeRepository,
       loadCommitGraph,
       setSelectedCommit,
       setSearchQuery,
+      selectPrevCommit,
+      selectNextCommit,
     }),
     [
       repoPath,
@@ -130,7 +155,10 @@ export function useAppViewModel(): AppViewModel {
       selectedCommit,
       searchQuery,
       openRepository,
+      closeRepository,
       loadCommitGraph,
+      selectPrevCommit,
+      selectNextCommit,
     ]
   );
 }

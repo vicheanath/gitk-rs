@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useSettings } from "../../context/SettingsContext";
 import { AppSettings } from "../../types/settings";
+import { X } from "lucide-react";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -43,7 +44,7 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         <div className="settings-header">
           <span className="settings-title">Settings</span>
           <button className="settings-close" onClick={onClose} title="Close">
-            ✕
+            <X size={15} />
           </button>
         </div>
 

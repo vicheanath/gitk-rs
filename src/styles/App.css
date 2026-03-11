@@ -171,6 +171,19 @@ body {
   gap: 1rem;
 }
 
+.welcome-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.welcome-hint {
+  max-width: 460px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .welcome-screen h1 {
   font-size: 3rem;
   font-weight: 700;
@@ -197,6 +210,23 @@ body {
 .primary-button:hover {
   background-color: var(--accent-hover);
   box-shadow: 0 0 0 1px var(--accent);
+}
+
+.secondary-button {
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.secondary-button:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--accent);
 }
 
 /* GitK-style Title Bar */
@@ -228,6 +258,35 @@ body {
   gap: 4px;
 }
 
+.sidebar-toggle-btn,
+.settings-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px 8px;
+  font-size: 13px;
+  border-radius: 3px;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sidebar-toggle-btn:hover,
+.settings-btn:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.titlebar-search {
+  flex: 1;
+  max-width: 420px;
+  margin: 0 0.75rem;
+}
+
 .app-title-text {
   color: var(--text-primary);
 }
@@ -245,7 +304,9 @@ body {
 }
 
 .app-sidebar {
+  width: 220px;
   min-width: 150px;
+  max-width: 400px;
   border-right: 1px solid var(--border-color);
   background-color: var(--bg-secondary);
   overflow-y: auto;
@@ -298,6 +359,9 @@ body {
   font-size: 0.875rem;
   color: var(--text-secondary);
   user-select: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .search-bar.classic-gitk .search-input {
@@ -433,6 +497,20 @@ body {
 
 .graph-error {
   color: var(--danger);
+}
+
+.graph-error-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+.graph-error-actions {
+  display: flex;
+  gap: 0.75rem;
 }
 
 /* Commit List */
@@ -832,6 +910,9 @@ body {
   padding: 0.25rem 0.5rem;
   font-size: 11px;
   min-width: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .branch-list-header {
@@ -876,8 +957,9 @@ body {
 
 .branch-item .branch-indicator {
   color: var(--accent);
-  font-size: 10px;
-  margin-right: 0.375rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .branch-item .branch-remote-indicator {
@@ -929,6 +1011,9 @@ body {
   border-radius: 0.25rem;
   cursor: pointer;
   color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .branch-actions button:hover {
@@ -2242,6 +2327,56 @@ body {
   cursor: not-allowed;
 }
 
+.info-dialog {
+  max-width: 520px;
+}
+
+.info-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.shortcuts-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.shortcuts-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.shortcuts-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.75rem;
+  padding: 0.125rem 0.5rem;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.shortcuts-description {
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
 .branch-list-actions {
   display: flex;
   gap: 0.5rem;
@@ -2257,6 +2392,9 @@ body {
   border-radius: 4px;
   font-size: 14px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: color 0.15s, border-color 0.15s;
 }
 .settings-btn:hover {
@@ -2273,6 +2411,9 @@ body {
   border-radius: 4px;
   font-size: 14px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: color 0.15s, border-color 0.15s;
 }
 
@@ -2331,6 +2472,9 @@ body {
   padding: 2px 6px;
   border-radius: 3px;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .settings-close:hover { color: var(--danger); }
 
