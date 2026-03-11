@@ -13,7 +13,6 @@ import CommitGraphList from "./components/CommitGraphList/CommitGraphList";
 import CommitDetails from "./components/CommitDetails/CommitDetails";
 import ResizableDivider from "./components/ResizableDivider/ResizableDivider";
 import SettingsDialog from "./components/Settings/SettingsDialog";
-import ThemeToggle from "./components/ThemeToggle";
 import AboutDialog from "./components/AboutDialog";
 import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog";
 import { useAppShellViewModel } from "./viewmodels/useAppShellViewModel";
@@ -187,13 +186,13 @@ function App() {
               {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
             </button>
           )}
-          <ThemeToggle />
           <button
-            className="settings-btn"
+            className="settings-btn settings-btn-wide"
             onClick={() => setSettingsOpen(true)}
             title="Settings"
           >
             <Settings2 size={16} />
+            <span>Settings</span>
           </button>
         </div>
       </div>

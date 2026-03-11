@@ -11,6 +11,8 @@ interface SettingsDialogProps {
 export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   const { settings, updateSettings } = useSettings();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const selectedTheme =
+    THEME_OPTIONS.find((theme) => theme.value === settings.theme) ?? THEME_OPTIONS[0];
 
   // Close on Escape key
   useEffect(() => {
@@ -57,41 +59,39 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
           <section className="settings-section settings-section-appearance">
             <h3 className="settings-section-title">Appearance</h3>
 
-            <div className="settings-row">
+            <div className="settings-row settings-theme-row">
               <label className="settings-label settings-label-stack">
                 <span>Theme</span>
                 <span className="settings-hint">Choose from 10 built-in themes</span>
               </label>
               <div className="settings-control settings-control-grow">
-                <div className="settings-theme-grid" role="radiogroup" aria-label="Theme selection">
-                  {THEME_OPTIONS.map((theme) => {
-                    const selected = settings.theme === theme.value;
-                    return (
-                      <button
-                        key={theme.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={selected}
-                        className={`settings-theme-card${selected ? " selected" : ""}`}
-                        onClick={() => field("theme", theme.value)}
-                        title={theme.description}
-                      >
-                        <span
-                          className="settings-theme-swatch"
-                          data-theme-preview={theme.value}
-                          aria-hidden="true"
-                        />
-                        <span className="settings-theme-meta">
-                          <span className="settings-theme-name">{theme.label}</span>
-                          <span className="settings-theme-description">{theme.description}</span>
-                        </span>
-                        {theme.highContrast ? (
-                          <span className="settings-theme-badge">HC</span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
+                <div className="settings-theme-toolbar">
+                  <div className="settings-theme-current">
+                    <span
+                      className="settings-theme-current-swatch"
+                      data-theme-preview={selectedTheme.value}
+                      aria-hidden="true"
+                    />
+                    <span className="settings-theme-current-meta">
+                      <span className="settings-theme-current-label">Current</span>
+                      <span className="settings-theme-current-name">{selectedTheme.label}</span>
+                      <span className="settings-theme-current-description">{selectedTheme.description}</span>
+                    </span>
+                  </div>
+                  <span className="settings-theme-count">{THEME_OPTIONS.length} themes</span>
                 </div>
+                <select
+                  className="settings-select settings-theme-select"
+                  value={settings.theme}
+                  onChange={(e) => field("theme", e.target.value as AppSettings["theme"])}
+                  aria-label="Theme selection"
+                >
+                  {THEME_OPTIONS.map((theme) => (
+                    <option key={theme.value} value={theme.value}>
+                      {theme.highContrast ? `[HC] ${theme.label}` : theme.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
