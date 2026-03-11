@@ -29,6 +29,8 @@ fn build_native_menu<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<ta
     let open_settings = MenuItemBuilder::with_id("open_settings", "Settings")
         .accelerator("CmdOrCtrl+,")
         .build(manager)?;
+    let setup_cli = MenuItemBuilder::with_id("setup_cli", "Setup 'gitr' CLI Command...")
+        .build(manager)?;
     let keyboard_shortcuts = MenuItemBuilder::with_id("show_shortcuts", "Keyboard Shortcuts")
         .accelerator("CmdOrCtrl+/")
         .build(manager)?;
@@ -38,6 +40,7 @@ fn build_native_menu<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<ta
         .item(&about)
         .separator()
         .item(&open_settings)
+        .item(&setup_cli)
         .separator()
         .item(&quit)
         .build()?;
@@ -122,6 +125,7 @@ pub fn run() {
                     "focus_search" => Some("focus_search"),
                     "toggle_sidebar" => Some("toggle_sidebar"),
                     "open_settings" => Some("open_settings"),
+                    "setup_cli" => Some("setup_cli"),
                     "show_shortcuts" => Some("show_shortcuts"),
                     _ => None,
                 };

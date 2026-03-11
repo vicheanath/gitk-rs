@@ -17,6 +17,7 @@ import ResizableDivider from "./components/ResizableDivider/ResizableDivider";
 import SettingsDialog from "./components/Settings/SettingsDialog";
 import AboutDialog from "./components/AboutDialog";
 import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog";
+import SetupCliDialog from "./components/SetupCliDialog";
 import LandingPage from "./components/LandingPage";
 import { useAppShellViewModel } from "./viewmodels/useAppShellViewModel";
 import { useEditorTabsViewModel } from "./viewmodels/useEditorTabsViewModel";
@@ -58,6 +59,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [setupCliOpen, setSetupCliOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [connections, setConnections] = useState<AuthConnection[]>([]);
   const searchBarRef = useRef<SearchBarRef>(null);
@@ -121,6 +123,9 @@ function App() {
           break;
         case "open_settings":
           setSettingsOpen(true);
+          break;
+        case "setup_cli":
+          setSetupCliOpen(true);
           break;
         case "open_about":
           setAboutOpen(true);
@@ -204,6 +209,7 @@ function App() {
         open={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
       />
+      <SetupCliDialog open={setupCliOpen} onClose={() => setSetupCliOpen(false)} />
       <div className="flex flex-1 overflow-hidden">
         {sidebarOpen && (
           <>

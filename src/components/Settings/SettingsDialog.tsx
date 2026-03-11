@@ -149,48 +149,47 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center overflow-hidden bg-black/60" onMouseDown={handleBackdropClick}>
       <div
-        className="flex max-h-[calc(100vh-16px)] w-[min(1060px,96vw)] flex-col overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl"
+        className="flex max-h-[calc(100vh-16px)] w-[min(900px,96vw)] flex-col overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-secondary)] shadow-2xl"
         ref={dialogRef}
       >
-        <div className="flex items-center justify-between border-b border-[var(--border-color)] px-4 py-3">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-primary)]">Settings</span>
-            <span className="text-[11px] text-[var(--text-secondary)]">Personalize appearance and repository behavior</span>
+        <div className="flex items-center justify-between border-b border-[var(--border-color)] px-6 py-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-lg font-semibold text-[var(--text-primary)]">Settings</h1>
+            <p className="text-sm text-[var(--text-secondary)]">Personalize appearance and repository behavior</p>
           </div>
           <button className="rounded-md border border-transparent p-1 text-[var(--text-secondary)] transition hover:border-[var(--border-color)] hover:text-[var(--danger)]" onClick={onClose} title="Close">
-            <X size={15} />
+            <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-hidden p-2.5">
-          <div className="grid h-full grid-cols-[1.2fr_0.8fr] gap-2 max-[680px]:grid-cols-1">
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-6">
           {/* Appearance */}
-          <section className="rounded-lg border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_74%,transparent)] p-2">
-            <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">Appearance</h3>
-
-            <div className="flex flex-col gap-1 py-1">
-              <label className="flex flex-col items-start gap-1 text-xs text-[var(--text-primary)]">
-                <span>Theme</span>
-                <span className="text-[10px] text-[var(--text-secondary)]">Choose from 10 built-in themes</span>
-              </label>
-              <div className="flex w-full flex-col items-stretch gap-1">
-                <div className="mb-1 flex items-center justify-between gap-2 max-[680px]:flex-col max-[680px]:items-start">
-                  <div className="inline-flex min-w-0 items-center gap-2 rounded-md border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_80%,transparent)] px-2 py-1.5">
+          <section className="rounded-lg border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_40%,transparent)]">
+            <div className="border-b border-[var(--border-color)] px-4 py-3">
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">Appearance</h2>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">Customize your visual experience</p>
+            </div>
+            <div className="space-y-4 px-4 py-3">
+              {/* Theme */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]">Theme</label>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Choose from {THEME_OPTIONS.length} built-in themes</p>
+                <div className="mt-2 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] p-3">
+                  <div className="flex items-center gap-3">
                     <span
-                      className="h-[18px] w-6 shrink-0 rounded border border-white/20 settings-theme-current-swatch"
+                      className="h-6 w-10 shrink-0 rounded border border-white/20 settings-theme-current-swatch"
                       data-theme-preview={selectedTheme.value}
                       aria-hidden="true"
                     />
-                    <span className="inline-flex min-w-0 flex-col">
-                      <span className="text-[9px] uppercase tracking-wider text-[var(--text-secondary)]">Current</span>
-                      <span className="text-[11px] font-semibold text-[var(--text-primary)]">{selectedTheme.label}</span>
-                      <span className="truncate text-[10px] text-[var(--text-secondary)]">{selectedTheme.description}</span>
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-[var(--text-primary)]">{selectedTheme.label}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">{selectedTheme.description}</p>
+                    </div>
                   </div>
-                  <span className="shrink-0 rounded-full border border-[var(--border-color)] px-2 py-0.5 text-[10px] text-[var(--text-secondary)]">{THEME_OPTIONS.length} themes</span>
                 </div>
                 <select
-                  className="min-h-8 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
+                  className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
                   value={settings.theme}
                   onChange={(e) => field("theme", e.target.value as AppSettings["theme"])}
                   aria-label="Theme selection"
@@ -202,13 +201,12 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   ))}
                 </select>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Font size</label>
-              <div className="flex items-center gap-1.5">
+              {/* Font Size */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]">Font size</label>
                 <select
-                  className="min-w-[130px] rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
+                  className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
                   value={settings.fontSize}
                   onChange={(e) =>
                     field(
@@ -222,13 +220,12 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   <option value="large">Large (15px)</option>
                 </select>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Date format</label>
-              <div className="flex items-center gap-1.5">
+              {/* Date Format */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]">Date format</label>
                 <select
-                  className="min-w-[130px] rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
+                  className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
                   value={settings.dateFormat}
                   onChange={(e) =>
                     field(
@@ -244,14 +241,19 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             </div>
           </section>
 
-          <section className="rounded-lg border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_74%,transparent)] p-2">
-            <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">Workspace</h3>
-
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Context lines</label>
-              <div className="flex items-center gap-1.5">
+          {/* Workspace */}
+          <section className="rounded-lg border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_40%,transparent)]">
+            <div className="border-b border-[var(--border-color)] px-4 py-3">
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">Workspace</h2>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">Repository and diff viewer settings</p>
+            </div>
+            <div className="space-y-4 px-4 py-3">
+              {/* Context Lines */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]">Context lines in diffs</label>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Number of unchanged lines shown around changes</p>
                 <input
-                  className="w-[72px] rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
+                  className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
                   type="number"
                   min={0}
                   max={100}
@@ -261,30 +263,29 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   }
                 />
               </div>
-            </div>
 
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Ignore whitespace</label>
-              <div className="flex items-center gap-1.5">
-                <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+              {/* Ignore Whitespace */}
+              <div>
+                <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
-                    className="h-3.5 w-3.5"
+                    className="h-4 w-4 cursor-pointer rounded border border-[var(--border-color)] bg-[var(--bg-primary)] accent-[var(--accent)]"
                     checked={settings.diffIgnoreWhitespace}
                     onChange={(e) =>
                       field("diffIgnoreWhitespace", e.target.checked)
                     }
                   />
-                  Enabled
+                  <span className="text-sm font-medium text-[var(--text-primary)]">Ignore whitespace changes</span>
                 </label>
+                <p className="ml-7 mt-0.5 text-xs text-[var(--text-secondary)]">Hide commits that only change whitespace</p>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Max commits to load</label>
-              <div className="flex items-center gap-1.5">
+              {/* Max Commits */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]">Maximum commits to load</label>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Higher values = slower, takes effect on next repository open</p>
                 <select
-                  className="min-w-[130px] rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
+                  className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
                   value={settings.maxCommits}
                   onChange={(e) =>
                     field(
@@ -294,158 +295,172 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
                   }
                 >
                   <option value={500}>500</option>
-                  <option value={1000}>1 000</option>
-                  <option value={2000}>2 000</option>
-                  <option value={5000}>5 000</option>
+                  <option value={1000}>1,000</option>
+                  <option value={2000}>2,000</option>
+                  <option value={5000}>5,000</option>
                 </select>
-                <span className="text-[10px] text-[var(--text-secondary)]">
-                  Takes effect on next repository open
-                </span>
               </div>
             </div>
           </section>
 
-          <section className="col-span-2 rounded-lg border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_74%,transparent)] p-2 max-[680px]:col-span-1">
-            <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">Git Accounts</h3>
-
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Provider</label>
-              <div className="flex w-full items-center gap-1.5">
-                <select
-                  className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
-                  value={provider}
-                  onChange={(event) => setProvider(event.target.value as GitProvider)}
-                >
-                  {PROVIDER_PRESETS.map((item) => (
-                    <option key={item.provider} value={item.provider}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          {/* Git Accounts */}
+          <section className="rounded-lg border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_40%,transparent)]">
+            <div className="border-b border-[var(--border-color)] px-4 py-3">
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">Git Accounts</h2>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">Connect GitHub, GitLab, Gitea, and other providers</p>
             </div>
+            <div className="space-y-4 px-4 py-3">
+              {/* Provider */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]">Provider</label>
+                  <select
+                    className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
+                    value={provider}
+                    onChange={(event) => setProvider(event.target.value as GitProvider)}
+                  >
+                    {PROVIDER_PRESETS.map((item) => (
+                      <option key={item.provider} value={item.provider}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Host</label>
-              <div className="flex w-full items-center gap-1.5">
-                <input
-                  className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
-                  value={host}
-                  onChange={(event) => setHost(event.target.value)}
-                  placeholder={providerPreset.defaultHost}
-                />
+                {/* Host */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]">Custom Host</label>
+                  <input
+                    className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
+                    value={host}
+                    onChange={(event) => setHost(event.target.value)}
+                    placeholder={providerPreset.defaultHost}
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Username (optional)</label>
-              <div className="flex w-full items-center gap-1.5">
-                <input
-                  className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  placeholder="username"
-                />
+              {/* Username and Display Name */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]">Username</label>
+                  <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Optional</p>
+                  <input
+                    className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    placeholder="username"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-primary)]">Display name</label>
+                  <p className="mt-0.5 text-xs text-[var(--text-secondary)]">e.g., Work account</p>
+                  <input
+                    className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
+                    value={displayName}
+                    onChange={(event) => setDisplayName(event.target.value)}
+                    placeholder="Work account"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Display name</label>
-              <div className="flex w-full items-center gap-1.5">
+              {/* Token and Scopes */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-primary)]">{providerPreset.tokenLabel}</label>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Required. Treat this like a password.</p>
                 <input
-                  className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="Work account"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">{providerPreset.tokenLabel}</label>
-              <div className="flex w-full items-center gap-1.5">
-                <input
-                  className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
+                  className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
                   type="password"
                   value={token}
                   onChange={(event) => setToken(event.target.value)}
                   placeholder="Paste token"
                 />
               </div>
-            </div>
 
-            <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
-              <label className="text-xs text-[var(--text-primary)]">Scopes (optional)</label>
-              <div className="flex w-full items-center gap-1.5">
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-[var(--text-primary)]">Token scopes</label>
+                    <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Optional. Comma-separated.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void invoke("open_url", { url: providerPreset.docsUrl })}
+                    className="shrink-0 text-xs text-[var(--accent)] hover:underline"
+                  >
+                    ? Docs
+                  </button>
+                </div>
                 <input
-                  className="w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-2 py-1 text-xs text-[var(--text-primary)]"
+                  className="mt-2 w-full rounded border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-primary)] transition hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
                   value={scopes}
                   onChange={(event) => setScopes(event.target.value)}
                   placeholder="repo, read_api, code"
                 />
-                <button
-                  type="button"
-                  onClick={() => void invoke("open_url", { url: providerPreset.docsUrl })}
-                  className="shrink-0 text-[10px] text-[var(--accent)] hover:underline"
-                >
-                  Token docs
-                </button>
               </div>
-            </div>
 
-            <div className="mt-1 flex justify-end">
+              {authError ? (
+                <div className="rounded-md border border-[#ef4444]/30 bg-[color-mix(in_srgb,#ef4444_8%,transparent)] px-3 py-2 text-xs text-[#ef4444]">
+                  {authError}
+                </div>
+              ) : null}
+
               <button
-                className="rounded bg-[var(--accent)] px-3 py-1.5 text-xs font-bold text-[#0c1117] disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-md bg-[var(--accent)] px-4 py-2 font-semibold text-[#0c1117] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                 type="button"
                 onClick={() => void handleConnect()}
                 disabled={authBusy}
               >
-                Connect
+                {authBusy ? "Connecting..." : "Connect Account"}
               </button>
-            </div>
 
-            {authError ? <div className="mt-1.5 text-[11px] text-[var(--danger)]">{authError}</div> : null}
-
-            <div className="mt-2 flex flex-col gap-1.5">
-              {connections.length === 0 ? (
-                <div className="text-[11px] text-[var(--text-secondary)]">No connected providers yet.</div>
-              ) : (
-                connections.map((connection) => (
-                  <div key={connection.id} className="flex items-center justify-between gap-2 rounded-md border border-[var(--border-color)] bg-[color-mix(in_srgb,var(--bg-primary)_80%,transparent)] px-2 py-1.5">
-                    <div>
-                      <div className="text-xs font-semibold text-[var(--text-primary)]">{connection.display_name}</div>
-                      <div className="text-[10px] text-[var(--text-secondary)]">
-                        {connection.provider} • {connection.host}
-                        {connection.username ? ` • ${connection.username}` : ""}
-                      </div>
+              {/* Connected Accounts List */}
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Connected accounts</h3>
+                <div className="mt-3 space-y-2">
+                  {connections.length === 0 ? (
+                    <div className="rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+                      No connected accounts yet
                     </div>
-                    <button
-                      className="rounded border border-[var(--border-color)] px-2 py-1 text-[11px] text-[var(--text-secondary)] hover:border-[color-mix(in_srgb,var(--danger)_45%,var(--border-color))] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50"
-                      type="button"
-                      onClick={() => void handleDisconnect(connection.id)}
-                      disabled={authBusy}
-                    >
-                      Disconnect
-                    </button>
-                  </div>
-                ))
-              )}
+                  ) : (
+                    connections.map((connection) => (
+                      <div key={connection.id} className="flex items-center justify-between gap-3 rounded-md border border-[var(--border-color)] bg-[var(--bg-primary)] px-3 py-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-[var(--text-primary)]">{connection.display_name}</p>
+                          <p className="text-xs text-[var(--text-secondary)]">
+                            {connection.provider} • {connection.host}
+                            {connection.username ? ` • @${connection.username}` : ""}
+                          </p>
+                        </div>
+                        <button
+                          className="shrink-0 rounded border border-[var(--border-color)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] transition hover:border-[color-mix(in_srgb,var(--danger)_45%,var(--border-color))] hover:bg-[color-mix(in_srgb,var(--danger)_10%,transparent)] hover:text-[var(--danger)] disabled:cursor-not-allowed disabled:opacity-50"
+                          type="button"
+                          onClick={() => void handleDisconnect(connection.id)}
+                          disabled={authBusy}
+                        >
+                          Disconnect
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           </section>
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-[var(--border-color)] px-4 py-2">
-          <span className="text-[10px] text-[var(--text-secondary)]">Changes save automatically</span>
-          <div className="inline-flex items-center gap-2">
+        <div className="flex items-center justify-between border-t border-[var(--border-color)] px-6 py-4">
+          <span className="text-xs text-[var(--text-secondary)]">Changes save automatically</span>
+          <div className="flex items-center gap-2">
             <button
-              className="rounded border border-[var(--border-color)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              className="rounded border border-[var(--border-color)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] transition hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
               onClick={() => updateSettings(DEFAULT_SETTINGS)}
             >
-              Reset
+              Reset to defaults
             </button>
             <button
-              className="rounded bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-[#0c1117] transition hover:brightness-105"
+              className="rounded bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-[#0c1117] transition hover:brightness-110"
               onClick={onClose}
             >
               Done

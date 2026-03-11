@@ -1,8 +1,11 @@
+import { useMemo } from "react";
+import { ChevronRight, ChevronDown, Folder, FolderOpen, File, FilePlus, FileMinus, FilePen } from "lucide-react";
 import { ChangedFile, TreeNode } from "../../types/git";
 import {
   formatTreeItemSize,
   useTreeViewViewModel,
 } from "../../viewmodels/useTreeViewViewModel";
+import { cn } from "../../lib/utils";
 
 interface TreeViewProps {
   commitId: string;
@@ -11,16 +14,36 @@ interface TreeViewProps {
   onFileSelect?: (filePath: string) => void;
 }
 
+const STATUS_ICON: Record<string, { icon: React.ReactNode; color: string }> = {
+  added:    { icon: <FilePlus size={13} />,  color: "var(--success)" },
+  deleted:  { icon: <FileMinus size={13} />, color: "var(--danger)" },
+  modified: { icon: <FilePen size={13} />,   color: "#60a5fa" },
+  renamed:  { icon: <FilePen size={13} />,   color: "#f59e0b" },
+};
+
+function FileIcon({ status }: { path?: string; status?: string }) {
+  if (status && STATUS_ICON[status]) {
+    const { icon, color } = STATUS_ICON[status];
+    return <span style={{ color }}>{icon}</span>;
+  }
+  return <File size={13} className="text-[var(--text-muted)]" />;
+}
+
 export default function TreeView({
   commitId,
   changedFiles = [],
   selectedFile,
   onFileSelect,
 }: TreeViewProps) {
+  // Build a status lookup map from changedFiles
+  const statusMap = useMemo<Record<string, ChangedFile["status"]>>(() => {
+    const map: Record<string, ChangedFile["status"]> = {};
+    for (const f of changedFiles) map[f.path] = f.status;
+    return map;
+  }, [changedFiles]);
   const {
     tree,
     loading,
-    itemCount,
     isPathExpanded,
     isPathSelected,
     toggleExpand,
@@ -39,32 +62,54 @@ export default function TreeView({
     const isDirectory = node.type === "tree";
 
     return (
-      <div key={node.path} className="space-y-0.5">
+      <div key={node.path}>
         <div
-          className={`flex cursor-pointer items-center gap-1 rounded px-1.5 py-1 text-xs transition-colors hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_72%,transparent)] ${
-            isSelected ? "bg-[color-mix(in_srgb,var(--bg-tertiary)_80%,transparent)]" : ""
-          }`}
+          className={cn(
+            "group flex cursor-pointer items-center gap-1.5 rounded py-[3px] pr-2 text-xs transition-colors",
+            "hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_65%,transparent)]",
+            isSelected && "bg-[color-mix(in_srgb,var(--accent)_15%,transparent)] text-[var(--text-primary)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--accent)_35%,transparent)]"
+          )}
           style={{ paddingLeft: `${level * 14 + 6}px` }}
           onClick={() => {
-            if (isDirectory) {
-              toggleExpand(node.path);
-            } else {
-              handleFileClick(node.path);
-            }
+            if (isDirectory) toggleExpand(node.path);
+            else handleFileClick(node.path);
           }}
         >
-          <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--text-muted)]">
+          {/* Expand/collapse chevron */}
+          <span className="shrink-0 text-[var(--text-muted)]">
             {isDirectory ? (
-              <span>{isExpanded ? "v" : ">"}</span>
+              isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />
             ) : (
-              <span>-</span>
+              <span className="inline-block w-3" />
             )}
           </span>
-          <span className="truncate text-[var(--text-primary)]">{node.name}</span>
+
+          {/* Folder or file icon */}
+          <span className="shrink-0">
+            {isDirectory ? (
+              isExpanded
+                ? <FolderOpen size={13} className="text-[#f59e0b]" />
+                : <Folder size={13} className="text-[#f59e0b]" />
+            ) : (
+              <FileIcon path={node.path} status={statusMap[node.path]} />
+            )}
+          </span>
+
+          <span className={cn(
+            "min-w-0 flex-1 truncate",
+            isSelected ? "font-medium text-[var(--text-primary)]" : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
+          )}>
+            {node.name}
+          </span>
+
+          {/* Size for files */}
           {!isDirectory && node.size !== undefined && (
-            <span className="ml-auto text-[10px] text-[var(--text-muted)]">{formatTreeItemSize(node.size)}</span>
+            <span className="ml-1 shrink-0 text-[10px] text-[var(--text-muted)]">
+              {formatTreeItemSize(node.size)}
+            </span>
           )}
         </div>
+
         {isDirectory && isExpanded && hasChildren && (
           <div>
             {node.children!.map((child) => renderTreeNode(child, level + 1))}
@@ -76,31 +121,25 @@ export default function TreeView({
 
   if (loading) {
     return (
-      <div className="p-2 text-xs text-[var(--text-secondary)]">
-        <p>Loading tree...</p>
+      <div className="flex flex-col gap-1 p-2">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-5 animate-pulse rounded bg-[var(--bg-tertiary)]" style={{ width: `${55 + (i * 13) % 35}%`, marginLeft: i % 2 === 1 ? "14px" : "0" }} />
+        ))}
       </div>
     );
   }
 
   if (tree.length === 0) {
     return (
-      <div className="p-2 text-xs text-[var(--text-secondary)]">
-        <p>No files in this commit</p>
+      <div className="p-3 text-center text-xs text-[var(--text-secondary)]">
+        No files in this commit
       </div>
     );
   }
 
   return (
-    <div className="p-1.5">
-      <div className="mb-1.5 flex items-center justify-between">
-        <h3 className="text-xs font-medium text-[var(--text-secondary)]">File Tree</h3>
-        <span className="text-[10px] text-[var(--text-muted)]">
-          {itemCount} item{itemCount !== 1 ? "s" : ""}
-        </span>
-      </div>
-      <div>
-        {tree.map((node) => renderTreeNode(node))}
-      </div>
+    <div className="py-1">
+      {tree.map((node) => renderTreeNode(node))}
     </div>
   );
 }
