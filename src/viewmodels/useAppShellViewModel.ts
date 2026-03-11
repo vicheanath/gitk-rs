@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useResizable } from "../hooks/useResizable";
 
@@ -11,23 +11,39 @@ export function useAppShellViewModel({
   isRepoOpen,
   openRepository,
 }: UseAppShellViewModelProps) {
+  const getWindowHeight = () =>
+    typeof window !== "undefined" ? window.innerHeight : 900;
+
+  const clampDetailsHeight = useCallback((value: number) => {
+    const min = 180;
+    const max = Math.max(min + 40, Math.floor(getWindowHeight() * 0.7));
+    return Math.max(min, Math.min(max, Math.round(value)));
+  }, []);
+
   const [graphWidth, handleGraphResize] = useResizable({
     initialSize: 200,
     minSize: 120,
     maxSize: 400,
   });
 
-  const [detailsHeight, handleDetailsResizeRaw] = useResizable({
-    initialSize: 300,
-    minSize: 200,
-    maxSize: window.innerHeight * 0.7,
-  });
+  const [detailsHeight, setDetailsHeight] = useState<number>(() =>
+    clampDetailsHeight(getWindowHeight() * 0.35)
+  );
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleDetailsResize = (delta: number) => {
-    handleDetailsResizeRaw(-delta);
+    setDetailsHeight((prev) => clampDetailsHeight(prev - delta));
   };
+
+  useEffect(() => {
+    const handleResize = () => {
+      setDetailsHeight((prev) => clampDetailsHeight(prev));
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [clampDetailsHeight]);
 
   const handleOpenRepo = async () => {
     try {

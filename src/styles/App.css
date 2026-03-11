@@ -258,6 +258,7 @@ body {
   flex: 1;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* Container for combined graph and commit list */
@@ -274,9 +275,11 @@ body {
   min-height: 150px;
   border-top: 1px solid var(--border-color);
   background-color: var(--bg-secondary);
-  overflow-y: auto;
+  overflow: hidden;
   flex-shrink: 0;
   width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Search Bar */
@@ -989,7 +992,9 @@ body {
 /* Commit Details */
 .commit-details {
   padding: 0.5rem;
-  height: 100%;
+  height: auto;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1973,6 +1978,23 @@ body {
   word-wrap: break-word;
   min-height: 1.5em;
   color: var(--text-primary);
+}
+
+.diff-simple-line.line-kind-diff-file-header {
+  margin-top: 0.85rem;
+  padding: 0.4rem 0.75rem;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.diff-simple-line.line-kind-diff-index,
+.diff-simple-line.line-kind-diff-meta,
+.diff-simple-line.line-kind-diff-hunk {
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  color: var(--text-secondary);
 }
 
 .diff-simple-line.diff-add {

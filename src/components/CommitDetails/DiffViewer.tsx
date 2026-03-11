@@ -146,12 +146,13 @@ export default function DiffViewer({
       const lineNum = idx + 1;
       const lineClass = getDiffLineClass(lineNum, line);
       const lineInfo = diffLineInfo.get(lineNum);
+      const lineKindClass = lineInfo?.kind ? `line-kind-${lineInfo.kind}` : "";
 
       if (!lineClass) {
         return (
           <div
             key={idx}
-            className="diff-simple-line"
+            className={`diff-simple-line ${lineKindClass}`.trim()}
             data-diff-file-path={lineInfo?.filePath}
             data-line-kind={lineInfo?.kind}
           >
@@ -163,7 +164,7 @@ export default function DiffViewer({
       return (
         <div
           key={idx}
-          className={`diff-simple-line ${lineClass}`}
+          className={`diff-simple-line ${lineClass} ${lineKindClass}`.trim()}
           data-diff-file-path={lineInfo?.filePath}
           data-line-kind={lineInfo?.kind}
         >

@@ -170,10 +170,11 @@ export default function CommitDetails({
               commitId={commitId}
               files={details.files}
               selectedFile={selectedFile}
+              onActiveFileChange={setSelectedFile}
               viewMode="diff"
               contextLines={contextLines}
               ignoreWhitespace={ignoreWhitespace}
-              showAllFilesInDiff={false}
+              showAllFilesInDiff
             />
           ) : (
             <div className="split-diff-layout">
