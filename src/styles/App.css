@@ -1400,6 +1400,12 @@ body {
   gap: 1px;
 }
 
+.changes-tree-list {
+  margin-left: 6px;
+  padding-left: 6px;
+  border-left: 1px dashed color-mix(in srgb, var(--border-color) 72%, transparent);
+}
+
 .changes-tree-node {
   list-style: none;
 }
@@ -1422,6 +1428,7 @@ body {
   cursor: pointer;
   color: var(--text-secondary);
   text-align: left;
+  border-color: color-mix(in srgb, var(--border-color) 35%, transparent);
 }
 
 .changes-row {
@@ -1431,6 +1438,10 @@ body {
 .changes-folder-row:hover,
 .changes-row:hover {
   background: color-mix(in srgb, var(--bg-tertiary) 72%, transparent);
+}
+
+.changes-folder-row:hover {
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border-color));
 }
 
 .changes-row.selected {
@@ -1459,6 +1470,41 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.changes-folder-text {
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.32rem;
+  overflow: hidden;
+  flex: 1;
+}
+
+.changes-folder-meta {
+  color: var(--text-secondary);
+  font-size: 10px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.92;
+}
+
+.changes-folder-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 16px;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-tertiary) 86%, transparent);
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .changes-row-main {

@@ -136,6 +136,11 @@ function classifyDiffLine(line: string): string {
   return "";
 }
 
+function countFilesInNode(node: ChangeNode): number {
+  if (node.type === "file") return 1;
+  return node.children.reduce((sum, child) => sum + countFilesInNode(child), 0);
+}
+
 export default function ChangesPanel() {
   const { loadCommitGraph, setSelectedCommit } = useAppContext();
   const [files, setFiles] = useState<WorkingTreeFile[]>([]);
@@ -397,6 +402,11 @@ export default function ChangesPanel() {
     }
 
     const expanded = expandedFolders.has(node.path);
+    const folderFileCount = node.children.reduce((sum, child) => sum + countFilesInNode(child), 0);
+    const folderPathMeta = node.path.includes("/")
+      ? node.path.slice(0, node.path.lastIndexOf("/"))
+      : "";
+
     return (
       <li key={node.path} className="changes-tree-node">
         <button
@@ -409,7 +419,15 @@ export default function ChangesPanel() {
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </span>
           <span className="changes-folder-icon"><Folder size={12} /></span>
-          <span className="changes-folder-name">{node.name}</span>
+          <span className="changes-folder-text">
+            <span className="changes-folder-name" title={node.path}>{node.name}</span>
+            {folderPathMeta ? (
+              <span className="changes-folder-meta" title={folderPathMeta}>{folderPathMeta}</span>
+            ) : null}
+          </span>
+          <span className="changes-folder-count" title={`${folderFileCount} file${folderFileCount > 1 ? "s" : ""}`}>
+            {folderFileCount}
+          </span>
         </button>
         {expanded ? (
           <ul className="changes-tree-list">
