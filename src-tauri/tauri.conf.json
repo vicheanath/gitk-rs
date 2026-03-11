@@ -1,0 +1,44 @@
+{
+  "productName": "gitk-rs",
+  "version": "1.0.0",
+  "identifier": "com.gitk-rs.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "GitK-RS",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "capabilities": [
+        {
+          "identifier": "main-capability",
+          "description": "Main application capability",
+          "windows": ["main"],
+          "permissions": [
+            "core:default",
+            "dialog:allow-open",
+            "dialog:default"
+          ]
+        }
+      ]
+    },
+    "withGlobalTauri": false
+  },
+  "bundle": {
+    "active": false
+  }
+}
+
