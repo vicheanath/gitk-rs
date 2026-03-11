@@ -16,6 +16,7 @@ export interface AppViewModel {
   selectedCommit: string | null;
   searchQuery: string;
   openRepository: (path: string) => Promise<void>;
+  closeRepository: () => void;
   loadCommitGraph: () => Promise<void>;
   setSelectedCommit: (commitId: string | null) => void;
   setSearchQuery: (query: string) => void;
@@ -115,6 +116,17 @@ export function useAppViewModel(): AppViewModel {
     [loadCommitGraph]
   );
 
+  const closeRepository = useCallback(() => {
+    setRepoPath(null);
+    setIsRepoOpen(false);
+    setNodes([]);
+    setEdges([]);
+    setLoadingGraph(false);
+    setGraphError(null);
+    setSelectedCommit(null);
+    setSearchQuery("");
+  }, []);
+
   return useMemo(
     () => ({
       repoPath,
@@ -126,6 +138,7 @@ export function useAppViewModel(): AppViewModel {
       selectedCommit,
       searchQuery,
       openRepository,
+      closeRepository,
       loadCommitGraph,
       setSelectedCommit,
       setSearchQuery,
@@ -142,6 +155,7 @@ export function useAppViewModel(): AppViewModel {
       selectedCommit,
       searchQuery,
       openRepository,
+      closeRepository,
       loadCommitGraph,
       selectPrevCommit,
       selectNextCommit,

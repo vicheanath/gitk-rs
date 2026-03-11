@@ -7,6 +7,8 @@ import CommitDetails from "./components/CommitDetails/CommitDetails";
 import ResizableDivider from "./components/ResizableDivider/ResizableDivider";
 import SettingsDialog from "./components/Settings/SettingsDialog";
 import ThemeToggle from "./components/ThemeToggle";
+import AboutDialog from "./components/AboutDialog";
+import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog";
 import { useAppShellViewModel } from "./viewmodels/useAppShellViewModel";
 import Sidebar from "./components/Sidebar/Sidebar";
 import SearchBar, { SearchBarRef } from "./components/SearchBar";
@@ -25,6 +27,7 @@ function App() {
     loadingGraph,
     graphError,
     openRepository,
+    closeRepository,
     loadCommitGraph,
     setSelectedCommit,
     setSearchQuery,
@@ -44,6 +47,8 @@ function App() {
   } = useAppShellViewModel({ isRepoOpen, openRepository });
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const searchBarRef = useRef<SearchBarRef>(null);
 
@@ -73,6 +78,9 @@ function App() {
         case "open_repository":
           void handleOpenRepo();
           break;
+        case "close_repository":
+          closeRepository();
+          break;
         case "reload_graph":
           if (isRepoOpen) {
             void loadCommitGraph();
@@ -87,6 +95,12 @@ function App() {
         case "open_settings":
           setSettingsOpen(true);
           break;
+        case "open_about":
+          setAboutOpen(true);
+          break;
+        case "show_shortcuts":
+          setShortcutsOpen(true);
+          break;
       }
     }).then((cleanup) => {
       unlisten = cleanup;
@@ -95,7 +109,7 @@ function App() {
     return () => {
       unlisten?.();
     };
-  }, [handleOpenRepo, isRepoOpen, loadCommitGraph]);
+  }, [closeRepository, handleOpenRepo, isRepoOpen, loadCommitGraph]);
 
   if (!isRepoOpen) {
     return (
@@ -163,6 +177,11 @@ function App() {
         </div>
       </div>
       <SettingsDialog open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <AboutDialog open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <KeyboardShortcutsDialog
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
       <div className="app-body">
         {sidebarOpen && (
           <>

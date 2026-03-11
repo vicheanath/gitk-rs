@@ -8,8 +8,13 @@ mod commands;
 mod git_engine;
 
 fn build_native_menu<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<tauri::menu::Menu<R>> {
+    let about = MenuItemBuilder::with_id("open_about", "About GitK-RS")
+        .build(manager)?;
     let open_repository = MenuItemBuilder::with_id("open_repository", "Open Repository...")
         .accelerator("CmdOrCtrl+O")
+        .build(manager)?;
+    let close_repository = MenuItemBuilder::with_id("close_repository", "Close Repository")
+        .accelerator("CmdOrCtrl+Shift+W")
         .build(manager)?;
     let reload_graph = MenuItemBuilder::with_id("reload_graph", "Reload Graph")
         .accelerator("CmdOrCtrl+R")
@@ -23,9 +28,14 @@ fn build_native_menu<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<ta
     let open_settings = MenuItemBuilder::with_id("open_settings", "Settings")
         .accelerator("CmdOrCtrl+,")
         .build(manager)?;
+    let keyboard_shortcuts = MenuItemBuilder::with_id("show_shortcuts", "Keyboard Shortcuts")
+        .accelerator("CmdOrCtrl+/")
+        .build(manager)?;
     let quit = PredefinedMenuItem::quit(manager, Some("Quit GitK-RS"))?;
 
     let app_menu = SubmenuBuilder::new(manager, "GitK-RS")
+        .item(&about)
+        .separator()
         .item(&open_settings)
         .separator()
         .item(&quit)
@@ -33,7 +43,20 @@ fn build_native_menu<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<ta
 
     let file_menu = SubmenuBuilder::new(manager, "File")
         .item(&open_repository)
+        .item(&close_repository)
+        .separator()
         .item(&reload_graph)
+        .build()?;
+
+    let edit_menu = SubmenuBuilder::new(manager, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .separator()
+        .select_all()
         .build()?;
 
     let view_menu = SubmenuBuilder::new(manager, "View")
@@ -41,10 +64,16 @@ fn build_native_menu<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<ta
         .item(&toggle_sidebar)
         .build()?;
 
+    let help_menu = SubmenuBuilder::new(manager, "Help")
+        .item(&keyboard_shortcuts)
+        .build()?;
+
     MenuBuilder::new(manager)
         .item(&app_menu)
         .item(&file_menu)
+        .item(&edit_menu)
         .item(&view_menu)
+        .item(&help_menu)
         .build()
 }
 
@@ -72,11 +101,14 @@ pub fn run() {
 
             app.on_menu_event(|app, event| {
                 let action = match event.id().as_ref() {
+                    "open_about" => Some("open_about"),
                     "open_repository" => Some("open_repository"),
+                    "close_repository" => Some("close_repository"),
                     "reload_graph" => Some("reload_graph"),
                     "focus_search" => Some("focus_search"),
                     "toggle_sidebar" => Some("toggle_sidebar"),
                     "open_settings" => Some("open_settings"),
+                    "show_shortcuts" => Some("show_shortcuts"),
                     _ => None,
                 };
 
