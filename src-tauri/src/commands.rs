@@ -792,3 +792,136 @@ fn fetch_gitlab_repositories(
         .collect())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use git2::{Repository, Signature};
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn make_temp_repo_path(test_name: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos();
+        std::env::temp_dir().join(format!("gitk-rs-commands-{test_name}-{nanos}"))
+    }
+
+    fn init_repo(test_name: &str) -> Repository {
+        let path = make_temp_repo_path(test_name);
+        fs::create_dir_all(&path).expect("create temp repo dir");
+        Repository::init(&path).expect("init repository")
+    }
+
+    fn commit_all(repo: &Repository, message: &str) {
+        let mut index = repo.index().expect("index");
+        index
+            .add_all(["*"], git2::IndexAddOption::DEFAULT, None)
+            .expect("add all");
+        index.write().expect("write index");
+
+        let tree_id = index.write_tree().expect("write tree");
+        let tree = repo.find_tree(tree_id).expect("find tree");
+        let sig = Signature::now("Test", "test@example.com").expect("signature");
+
+        match repo.head() {
+            Ok(head) => {
+                let parent = head
+                    .target()
+                    .and_then(|oid| repo.find_commit(oid).ok())
+                    .expect("parent commit");
+                repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[&parent])
+                    .expect("commit");
+            }
+            Err(_) => {
+                repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[])
+                    .expect("initial commit");
+            }
+        }
+    }
+
+    #[test]
+    fn infer_repo_dir_name_handles_git_suffix_and_trailing_slash() {
+        assert_eq!(
+            infer_repo_dir_name("https://github.com/vicheanath/gitk-rs.git/").expect("name"),
+            "gitk-rs"
+        );
+    }
+
+    #[test]
+    fn infer_repo_dir_name_rejects_invalid_url() {
+        let err = infer_repo_dir_name("/").expect_err("should fail");
+        assert!(err.contains("Could not infer") || err.contains("Invalid repository URL"));
+    }
+
+    #[test]
+    fn github_api_bases_for_host_covers_public_and_enterprise() {
+        let public = github_api_bases_for_host("github.com");
+        assert_eq!(public, vec!["https://api.github.com".to_string()]);
+
+        let enterprise = github_api_bases_for_host("git.example.com");
+        assert_eq!(enterprise.len(), 2);
+        assert!(enterprise[0].contains("api.git.example.com"));
+        assert!(enterprise[1].contains("git.example.com/api/v3"));
+    }
+
+    #[test]
+    fn build_tree_node_sorts_directories_before_files() {
+        let repo = init_repo("tree-sort");
+        let workdir = repo.workdir().expect("workdir");
+
+        fs::create_dir_all(workdir.join("src/nested")).expect("create dirs");
+        fs::write(workdir.join("src/lib.rs"), "pub fn a() {}\n").expect("write src file");
+        fs::write(workdir.join("README.md"), "# readme\n").expect("write readme");
+
+        commit_all(&repo, "initial");
+
+        let head = repo.head().expect("head");
+        let commit = repo
+            .find_commit(head.target().expect("head target"))
+            .expect("commit");
+        let tree = commit.tree().expect("tree");
+
+        let nodes = build_tree_node(&repo, &tree, "").expect("tree nodes");
+        assert!(nodes.len() >= 2);
+
+        assert_eq!(nodes[0].node_type, "tree");
+        assert_eq!(nodes[0].name, "src");
+        assert_eq!(nodes[1].node_type, "blob");
+        assert_eq!(nodes[1].name, "README.md");
+    }
+
+    #[test]
+    fn build_tree_node_populates_blob_size_and_path() {
+        let repo = init_repo("tree-size");
+        let workdir = repo.workdir().expect("workdir");
+
+        fs::create_dir_all(workdir.join("docs")).expect("create docs dir");
+        let content = "hello world\n";
+        fs::write(workdir.join("docs/guide.txt"), content).expect("write file");
+
+        commit_all(&repo, "docs");
+
+        let head = repo.head().expect("head");
+        let commit = repo
+            .find_commit(head.target().expect("head target"))
+            .expect("commit");
+        let tree = commit.tree().expect("tree");
+
+        let root = build_tree_node(&repo, &tree, "").expect("root nodes");
+        let docs = root
+            .iter()
+            .find(|n| n.node_type == "tree" && n.name == "docs")
+            .expect("docs tree");
+        let children = docs.children.as_ref().expect("docs children");
+        let guide = children
+            .iter()
+            .find(|n| n.node_type == "blob" && n.name == "guide.txt")
+            .expect("guide blob");
+
+        assert_eq!(guide.path, "docs/guide.txt");
+        assert_eq!(guide.size, Some(content.len() as u64));
+    }
+}
+

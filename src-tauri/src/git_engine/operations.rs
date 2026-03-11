@@ -569,7 +569,7 @@ pub struct WorkingTreeFile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use git2::Oid;
+    use git2::{Oid, Time};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn make_temp_repo_path(test_name: &str) -> std::path::PathBuf {
@@ -597,6 +597,40 @@ mod tests {
         let tree_id = index.write_tree().expect("write tree");
         let tree = repo.find_tree(tree_id).expect("find tree");
         let sig = Signature::now("Test", "test@example.com").expect("signature");
+
+        match repo.head() {
+            Ok(head) => {
+                let parent = head
+                    .target()
+                    .and_then(|oid| repo.find_commit(oid).ok())
+                    .expect("parent commit");
+                repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[&parent])
+                    .expect("create commit")
+            }
+            Err(_) => repo
+                .commit(Some("HEAD"), &sig, &sig, message, &tree, &[])
+                .expect("create initial commit"),
+        }
+    }
+
+    fn commit_file_at_time(
+        repo: &Repository,
+        file_name: &str,
+        content: &str,
+        message: &str,
+        timestamp: i64,
+    ) -> Oid {
+        let workdir = repo.workdir().expect("workdir");
+        fs::write(workdir.join(file_name), content).expect("write file");
+
+        let mut index = repo.index().expect("index");
+        index.add_path(Path::new(file_name)).expect("add path");
+        index.write().expect("write index");
+
+        let tree_id = index.write_tree().expect("write tree");
+        let tree = repo.find_tree(tree_id).expect("find tree");
+        let sig = Signature::new("Test", "test@example.com", &Time::new(timestamp, 0))
+            .expect("signature");
 
         match repo.head() {
             Ok(head) => {
@@ -718,6 +752,82 @@ mod tests {
 
         assert!(diff.contains("diff --git"));
         assert!(diff.contains("a.txt"));
+    }
+
+    #[test]
+    fn get_branches_marks_one_current_branch() {
+        let repo = init_repo("branches-current");
+        commit_file(&repo, "a.txt", "one", "initial commit");
+
+        let branches = get_branches(&repo).expect("get branches");
+        assert!(!branches.is_empty());
+        assert_eq!(branches.iter().filter(|b| b.is_current).count(), 1);
+    }
+
+    #[test]
+    fn create_and_delete_branch_round_trip() {
+        let repo = init_repo("branches-create-delete");
+        commit_file(&repo, "a.txt", "one", "initial commit");
+
+        create_branch(&repo, "feature/test", None).expect("create branch");
+        let created = get_branches(&repo).expect("branches after create");
+        assert!(created.iter().any(|b| b.name == "feature/test" && !b.is_remote));
+
+        delete_branch(&repo, "feature/test").expect("delete branch");
+        let after_delete = get_branches(&repo).expect("branches after delete");
+        assert!(!after_delete.iter().any(|b| b.name == "feature/test" && !b.is_remote));
+    }
+
+    #[test]
+    fn get_tags_includes_lightweight_and_annotated() {
+        let repo = init_repo("tags-kinds");
+        let c1 = commit_file(&repo, "a.txt", "one", "initial commit");
+        let c2 = commit_file(&repo, "a.txt", "two", "second commit");
+
+        let c1_commit = repo.find_commit(c1).expect("commit c1");
+        let c2_obj = repo
+            .find_commit(c2)
+            .expect("commit c2")
+            .into_object();
+        let sig = Signature::now("Test", "test@example.com").expect("signature");
+
+        repo.tag_lightweight("v0.1.0", c1_commit.as_object(), false)
+            .expect("lightweight tag");
+        repo.tag("v0.2.0", &c2_obj, &sig, "annotated", false)
+            .expect("annotated tag");
+
+        let tags = get_tags(&repo).expect("get tags");
+        assert!(tags.iter().any(|t| t.name == "v0.1.0" && t.commit_id == c1.to_string()));
+        assert!(tags.iter().any(|t| t.name == "v0.2.0" && t.commit_id == c2.to_string()));
+    }
+
+    #[test]
+    fn preceding_and_following_tags_are_identified_for_middle_commit() {
+        let repo = init_repo("tags-timeline");
+        let c1 = commit_file_at_time(&repo, "a.txt", "one", "first", 1_700_000_000);
+        let c2 = commit_file_at_time(&repo, "a.txt", "two", "second", 1_700_000_100);
+        let c3 = commit_file_at_time(&repo, "a.txt", "three", "third", 1_700_000_200);
+
+        let c1_obj = repo
+            .find_commit(c1)
+            .expect("commit c1")
+            .into_object();
+        let c3_obj = repo
+            .find_commit(c3)
+            .expect("commit c3")
+            .into_object();
+        let sig = Signature::now("Test", "test@example.com").expect("signature");
+
+        repo.tag("v1.0.0", &c1_obj, &sig, "old", false)
+            .expect("tag v1.0.0");
+        repo.tag("v1.1.0", &c3_obj, &sig, "new", false)
+            .expect("tag v1.1.0");
+
+        let preceding = get_tags_preceding_commit(&repo, &c2.to_string()).expect("preceding tags");
+        let following = get_tags_following_commit(&repo, &c2.to_string()).expect("following tags");
+
+        assert!(preceding.iter().any(|t| t == "v1.0.0"));
+        assert!(following.iter().any(|t| t == "v1.1.0"));
     }
 }
 
