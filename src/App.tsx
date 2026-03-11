@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { check } from "@tauri-apps/plugin-updater";
 import {
   FolderGit2,
   GitCommitHorizontal,
@@ -91,6 +92,45 @@ function App() {
       .then((result) => setConnections(result))
       .catch(() => setConnections([]));
   }, [settingsOpen]);
+
+  useEffect(() => {
+    const isTauri =
+      typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+    if (!isTauri) return;
+
+    let cancelled = false;
+
+    const checkForUpdates = async () => {
+      try {
+        const update = await check();
+        if (!update || cancelled) {
+          return;
+        }
+
+        const shouldInstall = window.confirm(
+          `A new version (${update.version}) is available. Install update now?`
+        );
+        if (!shouldInstall || cancelled) {
+          return;
+        }
+
+        await update.downloadAndInstall();
+        if (!cancelled) {
+          window.alert(
+            "Update installed successfully. Please restart GitK-RS to use the latest version."
+          );
+        }
+      } catch (error) {
+        console.warn("Auto-update check failed:", error);
+      }
+    };
+
+    void checkForUpdates();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const isTauri =

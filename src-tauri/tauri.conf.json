@@ -1,6 +1,6 @@
 {
   "productName": "gitk-rs",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "identifier": "com.gitk-rs.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -26,16 +26,29 @@
         {
           "identifier": "main-capability",
           "description": "Main application capability",
-          "windows": ["main"],
+          "windows": [
+            "main"
+          ],
           "permissions": [
             "core:default",
             "dialog:allow-open",
-            "dialog:default"
+            "dialog:default",
+            "updater:default"
           ]
         }
       ]
     },
     "withGlobalTauri": false
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "dialog": false,
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/vicheanath/gitk-rs/releases/latest/download/latest.json"
+      ]
+    }
   },
   "bundle": {
     "active": true,
@@ -48,4 +61,3 @@
     ]
   }
 }
-
