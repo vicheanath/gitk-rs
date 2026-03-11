@@ -12,7 +12,7 @@ export default function ThemeToggle() {
 
   return (
     <button
-      className="theme-toggle"
+      className="inline-flex h-7 w-7 items-center justify-center rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)]"
       onClick={toggleTheme}
       title={`Switch to ${isLightMode ? "dark" : "light"} theme`}
     >

@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { WorkingTreeFile } from "../../types/git";
 import { useAppContext } from "../../context/AppContext";
+import { Button } from "../ui/button";
+import { Card, CardContent } from "../ui/card";
 
 type ViewMode = "tree" | "list";
 type SectionKind = "staged" | "unstaged";
@@ -127,27 +129,27 @@ function statusTone(file: WorkingTreeFile, section: SectionKind): string {
 }
 
 function classifyDiffLine(line: string): string {
-  if (line.startsWith("diff --git")) return "text-(--accent-primary)";
-  if (line.startsWith("index ")) return "text-(--text-muted)";
-  if (line.startsWith("@@")) return "text-(--warning)";
-  if (line.startsWith("---") || line.startsWith("+++")) return "text-(--text-secondary)";
-  if (line.startsWith("+") && !line.startsWith("+++")) return "text-(--success)";
-  if (line.startsWith("-") && !line.startsWith("---")) return "text-(--danger)";
+  if (line.startsWith("diff --git")) return "text-[var(--accent-primary)]";
+  if (line.startsWith("index ")) return "text-[var(--text-muted)]";
+  if (line.startsWith("@@")) return "text-[var(--warning)]";
+  if (line.startsWith("---") || line.startsWith("+++")) return "text-[var(--text-secondary)]";
+  if (line.startsWith("+") && !line.startsWith("+++")) return "text-[var(--success)]";
+  if (line.startsWith("-") && !line.startsWith("---")) return "text-[var(--danger)]";
   return "";
 }
 
 function statusToneClass(tone: string): string {
   switch (tone) {
     case "conflict":
-      return "text-(--danger)";
+      return "text-[var(--danger)]";
     case "deleted":
-      return "text-(--danger)";
+      return "text-[var(--danger)]";
     case "modified":
-      return "text-(--warning)";
+      return "text-[var(--warning)]";
     case "renamed":
-      return "text-(--accent-primary)";
+      return "text-[var(--accent-primary)]";
     default:
-      return "text-(--success)";
+      return "text-[var(--success)]";
   }
 }
 
@@ -173,6 +175,7 @@ export default function ChangesPanel() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const iconBtnClass = "h-6 w-6";
 
   const loadStatus = async () => {
     setLoading(true);
@@ -350,8 +353,8 @@ export default function ChangesPanel() {
     return (
       <li
         key={`${section}:${file.path}`}
-        className={`group flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-(--bg-secondary) ${
-          selected ? "bg-(--bg-secondary)" : ""
+        className={`group flex cursor-pointer items-center justify-between gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-[var(--bg-secondary)] ${
+          selected ? "bg-[var(--bg-secondary)]" : ""
         }`}
         style={compactPath ? { paddingLeft: `${level * 14 + 8}px` } : undefined}
         onClick={() => setSelectedChange({ path: file.path, section })}
@@ -360,15 +363,15 @@ export default function ChangesPanel() {
           <span className={`w-3 text-center font-mono text-[10px] font-semibold ${statusToneClass(tone)}`}>
             {formatStatus(file, section)}
           </span>
-          <span className="inline-flex h-3 w-3 items-center justify-center text-(--text-muted)">
+          <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--text-muted)]">
             <FileCode2 size={12} />
           </span>
           <div className="flex min-w-0 flex-col">
-            <span className="truncate text-(--text-primary)" title={file.path}>
+            <span className="truncate text-[var(--text-primary)]" title={file.path}>
               {compactPath ? fileName : file.path}
             </span>
             {compactPath && pathSuffix ? (
-              <span className="truncate text-[10px] text-(--text-muted)" title={pathSuffix}>
+              <span className="truncate text-[10px] text-[var(--text-muted)]" title={pathSuffix}>
                 {pathSuffix}
               </span>
             ) : null}
@@ -376,23 +379,27 @@ export default function ChangesPanel() {
         </div>
         <div className="flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
           {section === "staged" ? (
-            <button
-              type="button"
-              className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={(event) => {
-                event.stopPropagation();
-                void runAction(() => invoke("unstage_paths", { paths: [file.path] }));
-              }}
-              disabled={busy}
-              title="Unstage changes"
-            >
-              <Minus size={12} />
-            </button>
+            <>
+              <Button
+                type="button"
+                size="icon"
+                className={iconBtnClass}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void runAction(() => invoke("unstage_paths", { paths: [file.path] }));
+                }}
+                disabled={busy}
+                title="Unstage changes"
+              >
+                <Minus size={12} />
+              </Button>
+            </>
           ) : (
             <>
-              <button
+              <Button
                 type="button"
-                className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
+                size="icon"
+                className={iconBtnClass}
                 onClick={(event) => {
                   event.stopPropagation();
                   void runAction(() => invoke("discard_paths", { paths: [file.path] }));
@@ -401,10 +408,11 @@ export default function ChangesPanel() {
                 title="Discard changes"
               >
                 <RotateCcw size={12} />
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
-                className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
+                size="icon"
+                className={iconBtnClass}
                 onClick={(event) => {
                   event.stopPropagation();
                   void runAction(() => invoke("stage_paths", { paths: [file.path] }));
@@ -413,7 +421,7 @@ export default function ChangesPanel() {
                 title="Stage changes"
               >
                 <Check size={12} />
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -436,26 +444,26 @@ export default function ChangesPanel() {
       <li key={node.path} className="space-y-1">
         <button
           type="button"
-          className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-xs text-(--text-secondary) transition-colors hover:bg-(--bg-secondary)"
+          className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-secondary)]"
           style={{ paddingLeft: `${level * 14 + 8}px` }}
           onClick={() => toggleFolder(node.path)}
         >
-          <span className="inline-flex h-3 w-3 items-center justify-center text-(--text-muted)">
+          <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--text-muted)]">
             {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
           </span>
-          <span className="inline-flex h-3 w-3 items-center justify-center text-(--text-muted)"><Folder size={12} /></span>
+          <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--text-muted)]"><Folder size={12} /></span>
           <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate font-medium text-(--text-secondary)" title={node.path}>
+            <span className="truncate font-medium text-[var(--text-secondary)]" title={node.path}>
               {node.name}
             </span>
             {folderPathMeta ? (
-              <span className="truncate text-[10px] text-(--text-muted)" title={folderPathMeta}>
+              <span className="truncate text-[10px] text-[var(--text-muted)]" title={folderPathMeta}>
                 {folderPathMeta}
               </span>
             ) : null}
           </span>
           <span
-            className="rounded border border-(--border-primary) px-1 py-0.5 text-[10px] text-(--text-muted)"
+            className="rounded border border-[var(--border-primary)] px-1 py-0.5 text-[10px] text-[var(--text-muted)]"
             title={`${folderFileCount} file${folderFileCount > 1 ? "s" : ""}`}
           >
             {folderFileCount}
@@ -474,18 +482,18 @@ export default function ChangesPanel() {
     <div className="space-y-3 px-2 pb-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-(--text-secondary)">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
             Changes
           </h3>
-          <span className="text-[10px] text-(--text-muted)">
+          <span className="text-[10px] text-[var(--text-muted)]">
             {stagedFiles.length} staged, {unstagedFiles.length} unstaged
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className={`inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) ${
-              viewMode === "tree" ? "ring-1 ring-(--accent-primary)" : ""
+            className={`inline-flex h-6 w-6 items-center justify-center rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)] ${
+              viewMode === "tree" ? "ring-1 ring-[var(--accent-primary)]" : ""
             }`}
             onClick={() => setViewMode("tree")}
             title="Tree view"
@@ -494,8 +502,8 @@ export default function ChangesPanel() {
           </button>
           <button
             type="button"
-            className={`inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) ${
-              viewMode === "list" ? "ring-1 ring-(--accent-primary)" : ""
+            className={`inline-flex h-6 w-6 items-center justify-center rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)] ${
+              viewMode === "list" ? "ring-1 ring-[var(--accent-primary)]" : ""
             }`}
             onClick={() => setViewMode("list")}
             title="List view"
@@ -504,7 +512,7 @@ export default function ChangesPanel() {
           </button>
           <button
             type="button"
-            className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex h-6 w-6 items-center justify-center rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => void refreshAll()}
             disabled={busy}
             title="Refresh"
@@ -514,52 +522,54 @@ export default function ChangesPanel() {
         </div>
       </div>
 
-      <div className="space-y-2 rounded border border-(--border-primary) bg-(--bg-secondary) p-2">
+      <Card>
+        <CardContent className="space-y-2">
         <textarea
-          className="w-full resize-y rounded border border-(--border-primary) bg-(--bg-primary) px-2 py-1.5 text-xs text-(--text-primary) outline-none placeholder:text-(--text-muted) focus:ring-1 focus:ring-(--accent-primary)"
+          className="w-full resize-y rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] px-2 py-1.5 text-xs text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:ring-1 focus:ring-[var(--accent-primary)]"
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           placeholder="Message"
           rows={2}
         />
-        <button
+        <Button
           type="button"
-          className="inline-flex h-7 items-center justify-center gap-1 rounded border border-(--border-primary) bg-(--bg-tertiary) px-2 text-xs font-medium text-(--text-primary) transition-colors hover:bg-(--bg-primary) disabled:cursor-not-allowed disabled:opacity-50"
+          className="h-7"
           onClick={() => void handleCommit()}
           disabled={busy || stagedFiles.length === 0 || !message.trim()}
         >
           <GitCommitHorizontal size={12} />
           Commit
-        </button>
-      </div>
+        </Button>
+        </CardContent>
+      </Card>
 
-      {error ? <div className="rounded border border-(--danger)/40 bg-(--danger)/10 px-2 py-1 text-xs text-(--danger)">{error}</div> : null}
+      {error ? <div className="rounded border border-[var(--danger)]/40 bg-[var(--danger)]/10 px-2 py-1 text-xs text-[var(--danger)]">{error}</div> : null}
 
       {loading ? (
-        <div className="px-2 py-4 text-xs text-(--text-secondary)">Loading changes...</div>
+        <div className="px-2 py-4 text-xs text-[var(--text-secondary)]">Loading changes...</div>
       ) : files.length === 0 ? (
-        <div className="rounded border border-dashed border-(--border-primary) px-3 py-4 text-xs text-(--text-secondary)">
+        <div className="rounded border border-dashed border-[var(--border-primary)] px-3 py-4 text-xs text-[var(--text-secondary)]">
           Working tree clean
         </div>
       ) : (
         <>
-          <section className="space-y-2 rounded border border-(--border-primary) bg-(--bg-secondary) p-2">
+          <section className="space-y-2 rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-2">
             <div className="flex items-center justify-between gap-2">
               <button
                 type="button"
-                className="inline-flex min-w-0 items-center gap-1 text-xs text-(--text-secondary)"
+                className="inline-flex min-w-0 items-center gap-1 text-xs text-[var(--text-secondary)]"
                 onClick={() => toggleSection("staged")}
               >
                 {expandedSections.staged ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 <span className="truncate font-medium">Staged Changes</span>
-                <span className="rounded border border-(--border-primary) px-1 py-0.5 text-[10px] text-(--text-muted)">
+                <span className="rounded border border-[var(--border-primary)] px-1 py-0.5 text-[10px] text-[var(--text-muted)]">
                   {stagedFiles.length}
                 </span>
               </button>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => void runAction(() => invoke("unstage_all"))}
                   disabled={busy || stagedFiles.length === 0}
                   title="Unstage all"
@@ -569,7 +579,7 @@ export default function ChangesPanel() {
               </div>
             </div>
             {!expandedSections.staged ? null : stagedFiles.length === 0 ? (
-              <div className="px-2 py-1 text-xs text-(--text-muted)">No staged files</div>
+              <div className="px-2 py-1 text-xs text-[var(--text-muted)]">No staged files</div>
             ) : (
               <ul className="space-y-1">
                 {stagedFiles.map((file) => renderFileRow(file, "staged", false))}
@@ -577,23 +587,23 @@ export default function ChangesPanel() {
             )}
           </section>
 
-          <section className="space-y-2 rounded border border-(--border-primary) bg-(--bg-secondary) p-2">
+          <section className="space-y-2 rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)] p-2">
             <div className="flex items-center justify-between gap-2">
               <button
                 type="button"
-                className="inline-flex min-w-0 items-center gap-1 text-xs text-(--text-secondary)"
+                className="inline-flex min-w-0 items-center gap-1 text-xs text-[var(--text-secondary)]"
                 onClick={() => toggleSection("unstaged")}
               >
                 {expandedSections.unstaged ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                 <span className="truncate font-medium">Changes</span>
-                <span className="rounded border border-(--border-primary) px-1 py-0.5 text-[10px] text-(--text-muted)">
+                <span className="rounded border border-[var(--border-primary)] px-1 py-0.5 text-[10px] text-[var(--text-muted)]">
                   {unstagedFiles.length}
                 </span>
               </button>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => void runAction(() => invoke("stage_all"))}
                   disabled={busy || unstagedFiles.length === 0}
                   title="Stage all"
@@ -602,7 +612,7 @@ export default function ChangesPanel() {
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary) disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)] disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => void runAction(() => invoke("discard_all"))}
                   disabled={busy || unstagedFiles.length === 0}
                   title="Discard all"
@@ -612,7 +622,7 @@ export default function ChangesPanel() {
               </div>
             </div>
             {!expandedSections.unstaged ? null : unstagedFiles.length === 0 ? (
-              <div className="px-2 py-1 text-xs text-(--text-muted)">No unstaged files</div>
+              <div className="px-2 py-1 text-xs text-[var(--text-muted)]">No unstaged files</div>
             ) : viewMode === "tree" ? (
               <ul className="space-y-1">
                 {unstagedTree.map((node) => renderTreeNode(node))}
@@ -624,25 +634,25 @@ export default function ChangesPanel() {
             )}
           </section>
 
-          <section className="overflow-hidden rounded border border-(--border-primary) bg-(--bg-secondary)">
-            <div className="border-b border-(--border-primary) px-2 py-1.5">
+          <section className="overflow-hidden rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
+            <div className="border-b border-[var(--border-primary)] px-2 py-1.5">
               <div>
-                <div className="text-xs font-medium text-(--text-primary)">Diff Preview</div>
-                <div className="truncate text-[10px] text-(--text-muted)">
+                <div className="text-xs font-medium text-[var(--text-primary)]">Diff Preview</div>
+                <div className="truncate text-[10px] text-[var(--text-muted)]">
                   {selectedChange
                     ? `${selectedChange.section === "staged" ? "Staged" : "Working Tree"} • ${selectedChange.path}`
                     : "Select a file to preview changes"}
                 </div>
               </div>
             </div>
-            <div className="max-h-64 overflow-auto bg-(--bg-primary) p-2 font-mono text-[11px] leading-5 text-(--text-secondary)">
-              {diffLoading ? <p className="text-(--text-secondary)">Loading diff...</p> : null}
-              {!diffLoading && diffError ? <p className="text-(--danger)">{diffError}</p> : null}
+            <div className="max-h-64 overflow-auto bg-[var(--bg-primary)] p-2 font-mono text-[11px] leading-5 text-[var(--text-secondary)]">
+              {diffLoading ? <p className="text-[var(--text-secondary)]">Loading diff...</p> : null}
+              {!diffLoading && diffError ? <p className="text-[var(--danger)]">{diffError}</p> : null}
               {!diffLoading && !diffError && !selectedChange ? (
-                <p className="text-(--text-muted)">Select a file to preview changes</p>
+                <p className="text-[var(--text-muted)]">Select a file to preview changes</p>
               ) : null}
               {!diffLoading && !diffError && selectedChange && diffText.trim().length === 0 ? (
-                <p className="text-(--text-muted)">No diff content available</p>
+                <p className="text-[var(--text-muted)]">No diff content available</p>
               ) : null}
               {!diffLoading && !diffError && diffText.trim().length > 0 ? (
                 <div>
@@ -651,7 +661,7 @@ export default function ChangesPanel() {
                     return (
                       <div
                         key={`${selectedChange?.section ?? "none"}:${selectedChange?.path ?? "none"}:${index}`}
-                        className={`whitespace-pre-wrap break-words ${lineClass}`.trim()}
+                        className={`whitespace-pre-wrap wrap-break-word ${lineClass}`.trim()}
                       >
                         {line}
                       </div>

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Tag } from "../../types/git";
 import { RefreshCw, Tag as TagIcon } from "lucide-react";
+import { Button } from "../ui/button";
+import { Card } from "../ui/card";
 
 export default function TagList() {
   const [tags, setTags] = useState<Tag[]>([]);
@@ -27,33 +29,33 @@ export default function TagList() {
   }, []);
 
   if (loading) {
-    return <div className="px-2 py-4 text-xs text-(--text-secondary)">Loading tags...</div>;
+    return <div className="px-2 py-4 text-xs text-[var(--text-secondary)]">Loading tags...</div>;
   }
 
   if (error) {
-    return <div className="px-2 py-4 text-xs text-(--danger)">Error: {error}</div>;
+    return <div className="px-2 py-4 text-xs text-[var(--danger)]">Error: {error}</div>;
   }
 
   return (
-    <div className="space-y-2 px-2 pb-3">
+    <Card className="space-y-2 p-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-(--text-secondary)">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
           Tags ({tags.length})
         </h3>
         <div className="flex items-center gap-1">
-          <button
+          <Button
             type="button"
-            className="inline-flex h-6 w-6 items-center justify-center rounded border border-(--border-primary) bg-(--bg-tertiary) text-(--text-primary) transition-colors hover:bg-(--bg-secondary)"
+            size="icon"
             onClick={loadTags}
             title="Refresh Tags"
           >
             <RefreshCw size={14} />
-          </button>
+          </Button>
         </div>
       </div>
 
       {tags.length === 0 ? (
-        <div className="rounded border border-dashed border-(--border-primary) px-3 py-4 text-xs text-(--text-secondary)">
+        <div className="rounded border border-dashed border-[var(--border-primary)] px-3 py-4 text-xs text-[var(--text-secondary)]">
           No tags found
         </div>
       ) : (
@@ -61,25 +63,25 @@ export default function TagList() {
           {tags.map((tag) => (
             <li
               key={tag.name}
-              className="space-y-0.5 rounded border border-(--border-primary) bg-(--bg-secondary) px-2 py-1"
+              className="space-y-0.5 rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)] px-2 py-1"
             >
               <div className="flex items-center gap-1.5">
-                <span className="inline-flex h-3 w-3 items-center justify-center text-(--accent-primary)">
+                <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--accent-primary)]">
                   <TagIcon size={12} />
                 </span>
-                <span className="truncate text-xs font-medium text-(--text-primary)">{tag.name}</span>
+                <span className="truncate text-xs font-medium text-[var(--text-primary)]">{tag.name}</span>
               </div>
-              <div className="font-mono text-[10px] text-(--text-muted)">
+              <div className="font-mono text-[10px] text-[var(--text-muted)]">
                 {tag.commit_id.substring(0, 8)}
               </div>
               {tag.message && (
-                <div className="line-clamp-2 text-[11px] text-(--text-secondary)">{tag.message}</div>
+                <div className="line-clamp-2 text-[11px] text-[var(--text-secondary)]">{tag.message}</div>
               )}
             </li>
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }
 

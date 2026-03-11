@@ -39,9 +39,11 @@ export default function TreeView({
     const isDirectory = node.type === "tree";
 
     return (
-      <div key={node.path} className="tree-node">
+      <div key={node.path} className="space-y-1">
         <div
-          className={`tree-item ${isSelected ? "selected" : ""}`}
+          className={`flex cursor-pointer items-center gap-1 rounded px-2 py-1 text-xs transition-colors hover:bg-[var(--bg-secondary)] ${
+            isSelected ? "bg-[var(--bg-secondary)]" : ""
+          }`}
           style={{ paddingLeft: `${level * 16 + 8}px` }}
           onClick={() => {
             if (isDirectory) {
@@ -51,20 +53,20 @@ export default function TreeView({
             }
           }}
         >
-          <span className="tree-icon">
+          <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--text-muted)]">
             {isDirectory ? (
-              <span className="tree-folder">{isExpanded ? "v" : ">"}</span>
+              <span>{isExpanded ? "v" : ">"}</span>
             ) : (
-              <span className="tree-file">-</span>
+              <span>-</span>
             )}
           </span>
-          <span className="tree-name">{node.name}</span>
+          <span className="truncate text-[var(--text-primary)]">{node.name}</span>
           {!isDirectory && node.size !== undefined && (
-            <span className="tree-size">{formatTreeItemSize(node.size)}</span>
+            <span className="ml-auto text-[10px] text-[var(--text-muted)]">{formatTreeItemSize(node.size)}</span>
           )}
         </div>
         {isDirectory && isExpanded && hasChildren && (
-          <div className="tree-children">
+          <div>
             {node.children!.map((child) => renderTreeNode(child, level + 1))}
           </div>
         )}
@@ -74,7 +76,7 @@ export default function TreeView({
 
   if (loading) {
     return (
-      <div className="tree-view">
+      <div className="p-3 text-xs text-[var(--text-secondary)]">
         <p>Loading tree...</p>
       </div>
     );
@@ -82,21 +84,21 @@ export default function TreeView({
 
   if (tree.length === 0) {
     return (
-      <div className="tree-view">
+      <div className="p-3 text-xs text-[var(--text-secondary)]">
         <p>No files in this commit</p>
       </div>
     );
   }
 
   return (
-    <div className="tree-view classic-gitk">
-      <div className="tree-header">
-        <h3>File Tree</h3>
-        <span className="tree-info">
+    <div className="p-2">
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-medium text-[var(--text-secondary)]">File Tree</h3>
+        <span className="text-[10px] text-[var(--text-muted)]">
           {itemCount} item{itemCount !== 1 ? "s" : ""}
         </span>
       </div>
-      <div className="tree-content">
+      <div>
         {tree.map((node) => renderTreeNode(node))}
       </div>
     </div>

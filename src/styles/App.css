@@ -1,7 +1,14 @@
-* {
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 :root {
@@ -12,6 +19,10 @@
   --text-secondary: #94a3b8;
   --border-color: #2b394a;
   --accent: #7ee787;
+  /* Alias tokens used by utility-class refactors */
+  --text-muted: var(--text-secondary);
+  --border-primary: var(--border-color);
+  --accent-primary: var(--accent);
   --accent-hover: #56d364;
   --success: #7ee787;
   --danger: #ff7b72;

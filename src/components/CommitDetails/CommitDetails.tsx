@@ -3,6 +3,10 @@ import FileList from "./FileList";
 import DiffViewer from "./DiffViewer";
 import TreeView from "./TreeView";
 import ResizableDivider from "../ResizableDivider/ResizableDivider";
+import { Button } from "../ui/button";
+import { Card, CardContent } from "../ui/card";
+import { Input } from "../ui/input";
+import { cn } from "../../lib/utils";
 import { CommitNode } from "../../types/git";
 import { useCommitDetailsViewModel } from "../../viewmodels/useCommitDetailsViewModel";
 
@@ -45,24 +49,24 @@ export default function CommitDetails({
 
   if (!commitId) {
     return (
-      <div className="commit-details">
-        <p className="empty-state">Select a commit to view details</p>
+      <div className="flex h-full items-center justify-center p-4">
+        <p className="text-sm text-[var(--text-secondary)]">Select a commit to view details</p>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="commit-details">
-        <p>Loading...</p>
+      <div className="flex h-full items-center justify-center p-4">
+        <p className="text-sm text-[var(--text-secondary)]">Loading...</p>
       </div>
     );
   }
 
   if (!details) {
     return (
-      <div className="commit-details">
-        <p>Failed to load commit details</p>
+      <div className="flex h-full items-center justify-center p-4">
+        <p className="text-sm text-[var(--danger)]">Failed to load commit details</p>
       </div>
     );
   }
@@ -92,140 +96,164 @@ export default function CommitDetails({
   };
 
   return (
-    <div className="commit-details classic-gitk github-commit-detail">
-      <div className="commit-details-top github-detail-header">
-        <div className="commit-id-section">
-          <span className="commit-id-label">Commit</span>
-          <span className="commit-hash">{details.id.substring(0, 8)}</span>
-          <span className="commit-row-info">{rowNumber}/{totalCommits}</span>
-          <button
-            type="button"
-            className={`copy-sha-btn ${copyState}`}
-            onClick={handleCopySha}
-            title="Copy full commit SHA"
-          >
-            {copyState === "copied"
-              ? "Copied"
-              : copyState === "failed"
-                ? "Copy failed"
-                : "Copy SHA"}
-          </button>
-        </div>
-        <div className="github-detail-meta">
-          <span>{details.author}</span>
-          <span className="meta-dot">•</span>
-          <span>{formattedDate}</span>
-          <span className="meta-dot">•</span>
-          <span className="stat-additions">+{fileStats.additions}</span>
-          <span className="stat-deletions">-{fileStats.deletions}</span>
-        </div>
-      </div>
-
-      <div className="commit-summary-card">
-        <div className="commit-summary-row">
-          <span className="summary-label">SHA</span>
-          <code className="summary-value sha-full">{details.id}</code>
-        </div>
-        <div className="commit-summary-row">
-          <span className="summary-label">Author</span>
-          <span className="summary-value">{details.author} &lt;{details.email}&gt;</span>
-        </div>
-        <div className="commit-summary-row">
-          <span className="summary-label">Committer</span>
-          <span className="summary-value">
-            {details.committer} &lt;{details.committer_email}&gt;
-          </span>
-        </div>
-        <div className="commit-summary-row message-row">
-          <span className="summary-label">Message</span>
-          <pre className="summary-value commit-message-pre">{details.message}</pre>
-        </div>
-      </div>
-
-      <div className="github-detail-controls">
-        <div className="mode-group">
-          <button
-            className={`mode-btn ${navigatorMode === "tree" ? "active" : ""}`}
-            onClick={() => setNavigatorMode("tree")}
-          >
-            Tree
-          </button>
-          <button
-            className={`mode-btn ${navigatorMode === "files" ? "active" : ""}`}
-            onClick={() => setNavigatorMode("files")}
-          >
-            Files
-          </button>
-        </div>
-
-        <div className="mode-group">
-          <button
-            className={`mode-btn ${diffDisplayMode === "unified" ? "active" : ""}`}
-            onClick={() => setDiffDisplayMode("unified")}
-          >
-            Unified
-          </button>
-          <button
-            className={`mode-btn ${diffDisplayMode === "split" ? "active" : ""}`}
-            onClick={() => setDiffDisplayMode("split")}
-          >
-            Split
-          </button>
-        </div>
-
-        <label className="context-label">
-          Context
-          <input
-            type="number"
-            min="0"
-            max="100"
-            value={contextLines}
-            onChange={(e) => {
-              const val = parseInt(e.target.value, 10);
-              if (!Number.isNaN(val) && val >= 0 && val <= 100) {
-                setContextLines(val);
-              }
-            }}
-          />
-        </label>
-
-        <label className="ignore-space">
-          <input
-            type="checkbox"
-            checked={ignoreWhitespace}
-            onChange={(e) => setIgnoreWhitespace(e.target.checked)}
-          />
-          Ignore whitespace
-        </label>
-      </div>
-
-      <div className="github-detail-layout">
-        <aside className="github-detail-sidebar" style={{ width: `${sidebarWidth}%` }}>
-          <div className="sidebar-header">
-            <span>Changed files ({details.files.length})</span>
+    <div className="flex h-full min-h-0 flex-col gap-2 bg-[var(--bg-primary)] p-2">
+      <Card className="p-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">Commit</span>
+            <span className="rounded border border-[var(--border-primary)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 font-mono text-xs text-[var(--text-primary)]">
+              {details.id.substring(0, 8)}
+            </span>
+            <span className="text-[10px] text-[var(--text-muted)]">{rowNumber}/{totalCommits}</span>
+            <Button
+              type="button"
+              size="sm"
+              className={cn(
+                "h-6 text-[10px]",
+                copyState === "copied" && "text-[var(--success)]",
+                copyState === "failed" && "text-[var(--danger)]"
+              )}
+              onClick={handleCopySha}
+              title="Copy full commit SHA"
+            >
+              {copyState === "copied"
+                ? "Copied"
+                : copyState === "failed"
+                  ? "Copy failed"
+                  : "Copy SHA"}
+            </Button>
           </div>
-          {navigatorMode === "tree" ? (
-            <TreeView
-              commitId={commitId}
-              changedFiles={details.files}
-              selectedFile={selectedFile}
-              onFileSelect={setSelectedFile}
-            />
-          ) : (
-            <FileList
-              files={details.files}
-              selectedFile={selectedFile}
-              onFileSelect={setSelectedFile}
-            />
-          )}
-        </aside>
+          <div className="flex flex-wrap items-center gap-1 text-xs text-[var(--text-secondary)]">
+            <span>{details.author}</span>
+            <span>•</span>
+            <span>{formattedDate}</span>
+            <span>•</span>
+            <span className="text-[var(--success)]">+{fileStats.additions}</span>
+            <span className="text-[var(--danger)]">-{fileStats.deletions}</span>
+          </div>
+        </div>
+      </Card>
 
+      <Card>
+        <CardContent className="space-y-2">
+          <div className="grid grid-cols-[82px_1fr] gap-2 text-xs">
+            <span className="uppercase tracking-wide text-[var(--text-muted)]">SHA</span>
+            <code className="overflow-x-auto rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] px-1.5 py-1 font-mono text-[var(--text-primary)]">
+              {details.id}
+            </code>
+          </div>
+          <div className="grid grid-cols-[82px_1fr] gap-2 text-xs">
+            <span className="uppercase tracking-wide text-[var(--text-muted)]">Author</span>
+            <span className="text-[var(--text-primary)]">{details.author} &lt;{details.email}&gt;</span>
+          </div>
+          <div className="grid grid-cols-[82px_1fr] gap-2 text-xs">
+            <span className="uppercase tracking-wide text-[var(--text-muted)]">Committer</span>
+            <span className="text-[var(--text-primary)]">
+              {details.committer} &lt;{details.committer_email}&gt;
+            </span>
+          </div>
+          <div className="grid grid-cols-[82px_1fr] gap-2 text-xs">
+            <span className="uppercase tracking-wide text-[var(--text-muted)]">Message</span>
+            <pre className="whitespace-pre-wrap rounded border border-[var(--border-primary)] bg-[var(--bg-primary)] px-2 py-1.5 text-[var(--text-primary)]">
+              {details.message}
+            </pre>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1 rounded border border-[var(--border-primary)] p-1">
+            <Button
+              variant={navigatorMode === "tree" ? "default" : "ghost"}
+              className="h-6"
+              onClick={() => setNavigatorMode("tree")}
+            >
+              Tree
+            </Button>
+            <Button
+              variant={navigatorMode === "files" ? "default" : "ghost"}
+              className="h-6"
+              onClick={() => setNavigatorMode("files")}
+            >
+              Files
+            </Button>
+          </div>
+
+          <div className="inline-flex items-center gap-1 rounded border border-[var(--border-primary)] p-1">
+            <Button
+              variant={diffDisplayMode === "unified" ? "default" : "ghost"}
+              className="h-6"
+              onClick={() => setDiffDisplayMode("unified")}
+            >
+              Unified
+            </Button>
+            <Button
+              variant={diffDisplayMode === "split" ? "default" : "ghost"}
+              className="h-6"
+              onClick={() => setDiffDisplayMode("split")}
+            >
+              Split
+            </Button>
+          </div>
+
+          <label className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)]">
+            Context
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              className="h-7 w-16"
+              value={contextLines}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!Number.isNaN(val) && val >= 0 && val <= 100) {
+                  setContextLines(val);
+                }
+              }}
+            />
+          </label>
+
+          <label className="inline-flex items-center gap-1 text-xs text-[var(--text-secondary)]">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5"
+              checked={ignoreWhitespace}
+              onChange={(e) => setIgnoreWhitespace(e.target.checked)}
+            />
+            Ignore whitespace
+          </label>
+        </CardContent>
+      </Card>
+
+      <div className="flex min-h-0 flex-1 gap-2">
+        <aside className="min-h-0 overflow-hidden rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)]" style={{ width: `${sidebarWidth}%` }}>
+          <div className="border-b border-[var(--border-primary)] px-2 py-1.5 text-xs font-medium text-[var(--text-secondary)]">
+            Changed files ({details.files.length})
+          </div>
+          <div className="min-h-0 h-[calc(100%-30px)] overflow-auto">
+            {navigatorMode === "tree" ? (
+              <TreeView
+                commitId={commitId}
+                changedFiles={details.files}
+                selectedFile={selectedFile}
+                onFileSelect={setSelectedFile}
+              />
+            ) : (
+              <FileList
+                files={details.files}
+                selectedFile={selectedFile}
+                onFileSelect={setSelectedFile}
+              />
+            )}
+          </div>
+        </aside>
         <ResizableDivider direction="vertical" onResize={handleSidebarResize} />
 
-        <section className="github-detail-diff">
+        <section className="min-h-0 flex-1 overflow-hidden rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)]">
           {!selectedFile ? (
-            <div className="diff-placeholder">
-              <p>Select a file to view its changes</p>
+            <div className="flex h-full items-center justify-center p-4">
+              <p className="text-sm text-[var(--text-secondary)]">Select a file to view its changes</p>
             </div>
           ) : diffDisplayMode === "unified" ? (
             <DiffViewer
@@ -239,9 +267,9 @@ export default function CommitDetails({
               showAllFilesInDiff
             />
           ) : (
-            <div className="split-diff-layout">
-              <div className="split-diff-pane">
-                <div className="split-pane-header">Old</div>
+            <div className="grid h-full min-h-0 grid-cols-2 gap-2 p-2 max-[980px]:grid-cols-1">
+              <div className="min-h-0 overflow-hidden rounded border border-[var(--border-primary)]">
+                <div className="border-b border-[var(--border-primary)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">Old</div>
                 <DiffViewer
                   commitId={commitId}
                   files={details.files}
@@ -252,8 +280,8 @@ export default function CommitDetails({
                   showAllFilesInDiff={false}
                 />
               </div>
-              <div className="split-diff-pane">
-                <div className="split-pane-header">New</div>
+              <div className="min-h-0 overflow-hidden rounded border border-[var(--border-primary)]">
+                <div className="border-b border-[var(--border-primary)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">New</div>
                 <DiffViewer
                   commitId={commitId}
                   files={details.files}

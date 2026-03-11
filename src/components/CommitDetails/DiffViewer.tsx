@@ -175,21 +175,21 @@ export default function DiffViewer({
   };
 
   return (
-    <div className="diff-viewer-simple">
-      <div className="diff-header-simple">
-        <span className="diff-stats-simple">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="border-b border-[var(--border-primary)] px-2 py-1.5">
+        <span className="text-xs text-[var(--text-secondary)]">
           {loading
             ? "Loading..."
             : `${files.length} file${files.length !== 1 ? "s" : ""} changed • +${totalAdditions} -${totalDeletions}`}
         </span>
       </div>
-      <div className="diff-content-simple">
+      <div className="min-h-0 flex-1 overflow-auto bg-[var(--bg-primary)] p-2 font-mono text-[11px] leading-5 text-[var(--text-secondary)]">
         {loading && <p>Loading...</p>}
         {!loading && (!content || content.trim().length === 0) && (
           <p>No diff content available</p>
         )}
         {!loading && content && content.trim().length > 0 && (
-          <div ref={contentRef} className="diff-simple-viewer">
+          <div ref={contentRef} className="space-y-0">
             {renderDiffContent()}
           </div>
         )}

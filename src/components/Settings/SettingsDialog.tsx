@@ -266,15 +266,16 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
             <div className="flex items-center justify-between gap-3 py-1 max-[680px]:flex-col max-[680px]:items-start">
               <label className="text-xs text-[var(--text-primary)]">Ignore whitespace</label>
               <div className="flex items-center gap-1.5">
-                <label className="settings-toggle">
+                <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-[var(--text-secondary)]">
                   <input
                     type="checkbox"
+                    className="h-3.5 w-3.5"
                     checked={settings.diffIgnoreWhitespace}
                     onChange={(e) =>
                       field("diffIgnoreWhitespace", e.target.checked)
                     }
                   />
-                  <span className="settings-toggle-track" />
+                  Enabled
                 </label>
               </div>
             </div>
@@ -433,10 +434,16 @@ export default function SettingsDialog({ open, onClose }: SettingsDialogProps) {
         <div className="flex items-center justify-between border-t border-[var(--border-color)] px-4 py-2">
           <span className="text-[10px] text-[var(--text-secondary)]">Changes save automatically</span>
           <div className="inline-flex items-center gap-2">
-            <button className="settings-reset-btn" onClick={() => updateSettings(DEFAULT_SETTINGS)}>
+            <button
+              className="rounded border border-[var(--border-color)] px-2.5 py-1 text-xs text-[var(--text-secondary)] transition hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]"
+              onClick={() => updateSettings(DEFAULT_SETTINGS)}
+            >
               Reset
             </button>
-            <button className="settings-done-btn" onClick={onClose}>
+            <button
+              className="rounded bg-[var(--accent)] px-3 py-1.5 text-xs font-semibold text-[#0c1117] transition hover:brightness-105"
+              onClick={onClose}
+            >
               Done
             </button>
           </div>

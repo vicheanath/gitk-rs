@@ -138,8 +138,8 @@ export default function CommitList({
 
   if (nodes.length === 0) {
     return (
-      <div className="commit-list">
-        <div className="commit-list-empty">
+      <div className="flex h-full items-center justify-center p-4">
+        <div className="rounded border border-dashed border-[var(--border-primary)] px-3 py-4 text-xs text-[var(--text-secondary)]">
           <p>No commits to display</p>
         </div>
       </div>
@@ -147,15 +147,15 @@ export default function CommitList({
   }
 
   return (
-    <div className="commit-list classic-gitk">
-      <div className="commit-table-wrapper">
-        <table className="commit-table">
+    <div className="h-full overflow-auto">
+      <div>
+        <table className="w-full table-fixed border-collapse text-xs">
           <thead>
-            <tr>
-              <th className="col-message">Message</th>
-              <th className="col-author">Author</th>
-              <th className="col-date">Date</th>
-              <th className="col-branches">Branches</th>
+            <tr className="sticky top-0 z-10 bg-[var(--bg-secondary)]">
+              <th className="w-[42%] border-b border-[var(--border-primary)] px-2 py-1.5 text-left font-semibold text-[var(--text-secondary)]">Message</th>
+              <th className="w-[18%] border-b border-[var(--border-primary)] px-2 py-1.5 text-left font-semibold text-[var(--text-secondary)]">Author</th>
+              <th className="w-[20%] border-b border-[var(--border-primary)] px-2 py-1.5 text-left font-semibold text-[var(--text-secondary)]">Date</th>
+              <th className="w-[20%] border-b border-[var(--border-primary)] px-2 py-1.5 text-left font-semibold text-[var(--text-secondary)]">Branches</th>
             </tr>
           </thead>
           <tbody>
@@ -169,32 +169,34 @@ export default function CommitList({
                 <tr
                   key={node.id}
                   ref={isSelected ? selectedItemRef : null}
-                  className={`commit-row ${isSelected ? "selected" : ""}`}
+                  className={`cursor-pointer border-b border-[var(--border-primary)]/60 transition-colors hover:bg-[var(--bg-secondary)] ${
+                    isSelected ? "bg-[var(--bg-secondary)]" : ""
+                  }`}
                   onClick={() => onCommitSelect(node.id)}
                   data-commit-id={node.id}
                   data-row-index={rowIndex}
                 >
-                  <td className="col-message">
-                    <div className="commit-message-cell">
-                      {isMerge && <span className="merge-badge">M</span>}
-                      <span className="commit-message-text">{summary}</span>
+                  <td className="px-2 py-1.5">
+                    <div className="flex items-center gap-1.5">
+                      {isMerge && <span className="rounded border border-[var(--warning)] px-1 text-[10px] text-[var(--warning)]">M</span>}
+                      <span className="truncate text-[var(--text-primary)]">{summary}</span>
                     </div>
                   </td>
-                  <td className="col-author">{node.author}</td>
-                  <td className="col-date">{formatDate(node.time)}</td>
-                  <td className="col-branches">
-                    <div className="commit-branch-labels">
+                  <td className="truncate px-2 py-1.5 text-[var(--text-secondary)]">{node.author}</td>
+                  <td className="px-2 py-1.5 text-[var(--text-secondary)]">{formatDate(node.time)}</td>
+                  <td className="px-2 py-1.5">
+                    <div className="flex flex-wrap gap-1">
                       {branches.map((branchName) => (
                         <span
                           key={branchName}
-                          className="branch-label"
+                          className="inline-flex max-w-full items-center rounded border border-[var(--border-primary)] px-1.5 py-0.5 text-[10px] font-medium"
                           style={{
                             backgroundColor: getBranchColor(branchName),
                             color: "#000",
                           }}
                           title={branchName}
                         >
-                          {branchName}
+                          <span className="truncate">{branchName}</span>
                         </span>
                       ))}
                     </div>
