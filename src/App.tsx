@@ -316,7 +316,7 @@ function App() {
                 )}
               </div>
             ) : (
-              <CommitDetails commitId={activeTab.commitId} nodes={nodes} />
+              <CommitDetails commitId={activeTab.commitId} nodes={nodes} graphWidth={graphWidth} />
             )}
           </div>
         </div>

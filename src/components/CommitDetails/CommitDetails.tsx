@@ -12,11 +12,13 @@ import { useCommitDetailsViewModel } from "../../viewmodels/useCommitDetailsView
 interface CommitDetailsProps {
   commitId?: string;
   nodes?: CommitNode[];
+  graphWidth?: number;
 }
 
 export default function CommitDetails({
   commitId,
   nodes = [],
+  graphWidth = 0,
 }: CommitDetailsProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
     "idle"
@@ -153,7 +155,7 @@ export default function CommitDetails({
           </div>
           <div className="grid grid-cols-[78px_1fr] gap-1.5 text-xs">
             <span className="uppercase tracking-wide text-[var(--text-muted)]">Message</span>
-            <pre className="whitespace-pre-wrap rounded bg-[var(--bg-primary)] px-2 py-1.5 text-[var(--text-primary)]">
+            <pre className="whitespace-pre-wrap rounded bg-[var(--bg-primary)] px-2 py-1.5 text-[var(--text-primary)]" style={{ marginLeft: `${graphWidth}px` }}>
               {details.message}
             </pre>
           </div>

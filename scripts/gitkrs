@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# GitK-RS CLI launcher
+# This script opens a git repository in GitK-RS
+# Usage: gitkrs [path]
+
+set -e
+
+# Get the target directory
+TARGET_DIR="${1:-.}"
+
+# Resolve to absolute path
+TARGET_DIR=$(cd "$TARGET_DIR" 2>/dev/null && pwd || echo "$TARGET_DIR")
+
+# Check if it's a git repository
+if [ ! -d "$TARGET_DIR/.git" ]; then
+    echo "❌ Error: '$TARGET_DIR' is not a git repository"
+    exit 1
+fi
+
+# Find the app bundle or executable
+if [ -d "/Applications/gitk-rs.app" ]; then
+    # macOS app bundle installed in Applications
+    echo "📂 Opening repository: $TARGET_DIR"
+    open -a "gitk-rs"
+    echo "⏳ GitK-RS is starting..."
+    echo ""
+    echo "💡 Tip: If the repository doesn't auto-load, click 'Open Repository' in GitK-RS"
+    echo "    and enter: $TARGET_DIR"
+elif command -v gitkrs-bin &> /dev/null; then
+    # Direct binary execution
+    echo "📂 Opening repository: $TARGET_DIR"
+    gitkrs-bin "$TARGET_DIR" &
+else
+    echo "❌ Error: GitK-RS is not installed or not found in PATH"
+    echo "Please ensure GitK-RS is installed in /Applications/gitk-rs.app"
+    exit 1
+fi
+
+exit 0
