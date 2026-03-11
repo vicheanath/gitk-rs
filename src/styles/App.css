@@ -327,6 +327,7 @@ body {
   display: flex;
   align-items: stretch;
   gap: 1px;
+  flex-shrink: 0;
   padding: 0.35rem 0.5rem 0;
   border-bottom: 1px solid var(--border-color);
   background: linear-gradient(
@@ -336,6 +337,8 @@ body {
   );
   overflow-x: auto;
   scrollbar-width: thin;
+  position: relative;
+  z-index: 2;
 }
 
 .app-editor-tab {
@@ -408,10 +411,14 @@ body {
 }
 
 .app-tab-panel {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   min-width: 0;
   background: var(--bg-secondary);
+  overflow: hidden;
+  position: relative;
 }
 
 /* Container for combined graph and commit list */
@@ -1933,6 +1940,7 @@ body {
 /* GitHub-like commit detail layout */
 .github-commit-detail {
   gap: 0.5rem;
+  min-height: 0;
 }
 
 .github-detail-header {

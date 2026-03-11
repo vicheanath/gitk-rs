@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { GitCommitHorizontal, PanelLeftClose, PanelLeftOpen, Settings2, X } from "lucide-react";
 import { useAppContext } from "./context/AppContext";
@@ -10,15 +10,12 @@ import ThemeToggle from "./components/ThemeToggle";
 import AboutDialog from "./components/AboutDialog";
 import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog";
 import { useAppShellViewModel } from "./viewmodels/useAppShellViewModel";
+import { useEditorTabsViewModel } from "./viewmodels/useEditorTabsViewModel";
 import Sidebar from "./components/Sidebar/Sidebar";
 import SearchBar, { SearchBarRef } from "./components/SearchBar";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import "./styles/App.css";
 import "./styles/CommitGraphList.css";
-
-type EditorTab =
-  | { id: "graph"; type: "graph"; title: "Graph" }
-  | { id: `commit:${string}`; type: "commit"; commitId: string; title: string };
 
 function App() {
   const {
@@ -52,76 +49,14 @@ function App() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [openTabs, setOpenTabs] = useState<EditorTab[]>([
-    { id: "graph", type: "graph", title: "Graph" },
-  ]);
-  const [activeTabId, setActiveTabId] = useState<EditorTab["id"]>("graph");
   const searchBarRef = useRef<SearchBarRef>(null);
 
-  const commitTitleMap = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const node of nodes) {
-      map.set(node.id, node.summary || node.message.split("\n")[0] || node.id.slice(0, 7));
-    }
-    return map;
-  }, [nodes]);
-
-  const activeTab = openTabs.find((tab) => tab.id === activeTabId) ?? openTabs[0];
-
-  const openCommitTab = (commitId: string) => {
-    const tabId = `commit:${commitId}` as const;
-    const title = commitTitleMap.get(commitId) ?? commitId.slice(0, 7);
-
-    setOpenTabs((current) => {
-      if (current.some((tab) => tab.id === tabId)) {
-        return current;
-      }
-
-      return [...current, { id: tabId, type: "commit", commitId, title }];
+  const { openTabs, activeTab, selectCommitFromGraph, activateTab, closeTab } =
+    useEditorTabsViewModel({
+      isRepoOpen,
+      nodes,
+      setSelectedCommit,
     });
-    setActiveTabId(tabId);
-  };
-
-  const handleCommitSelect = (commitId: string | null) => {
-    setSelectedCommit(commitId);
-    if (commitId) {
-      openCommitTab(commitId);
-    }
-  };
-
-  const closeTab = (tabId: EditorTab["id"]) => {
-    if (tabId === "graph") {
-      return;
-    }
-
-    setOpenTabs((current) => {
-      const index = current.findIndex((tab) => tab.id === tabId);
-      if (index === -1) {
-        return current;
-      }
-
-      const nextTabs = current.filter((tab) => tab.id !== tabId);
-
-      if (activeTabId === tabId) {
-        const fallback = nextTabs[index] ?? nextTabs[index - 1] ?? nextTabs[0];
-        if (fallback) {
-          setActiveTabId(fallback.id);
-          if (fallback.type === "commit") {
-            setSelectedCommit(fallback.commitId);
-          }
-        }
-      }
-
-      return nextTabs;
-    });
-  };
-
-  const activateTab = (tab: EditorTab) => {
-    setActiveTabId(tab.id);
-    if (tab.type === "commit") {
-      setSelectedCommit(tab.commitId);
-    }
-  };
 
   useKeyboardShortcuts({
     onArrowUp: selectPrevCommit,
@@ -133,26 +68,6 @@ function App() {
   const handleToggleSidebar = () => {
     setSidebarOpen((value) => !value);
   };
-
-  useEffect(() => {
-    if (!isRepoOpen) {
-      setOpenTabs([{ id: "graph", type: "graph", title: "Graph" }]);
-      setActiveTabId("graph");
-    }
-  }, [isRepoOpen]);
-
-  useEffect(() => {
-    setOpenTabs((current) =>
-      current.map((tab) => {
-        if (tab.type !== "commit") {
-          return tab;
-        }
-
-        const nextTitle = commitTitleMap.get(tab.commitId) ?? tab.commitId.slice(0, 7);
-        return nextTitle === tab.title ? tab : { ...tab, title: nextTitle };
-      })
-    );
-  }, [commitTitleMap]);
 
   useEffect(() => {
     const isTauri =
@@ -352,7 +267,7 @@ function App() {
                       nodes={nodes}
                       edges={edges}
                       selectedCommit={selectedCommit || undefined}
-                      onCommitSelect={handleCommitSelect}
+                      onCommitSelect={selectCommitFromGraph}
                       searchQuery={searchQuery}
                       graphWidth={graphWidth}
                     />
