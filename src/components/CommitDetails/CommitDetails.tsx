@@ -113,6 +113,7 @@ export default function CommitDetails({
             commitId={commitId}
             files={details.files}
             selectedFile={selectedFile}
+            onActiveFileChange={setSelectedFile}
             diffDisplayMode={diffDisplayMode}
             contextLines={contextLines}
             ignoreWhitespace={ignoreWhitespace}

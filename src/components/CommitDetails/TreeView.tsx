@@ -64,6 +64,7 @@ export default function TreeView({
     return (
       <div key={node.path}>
         <div
+          data-file-path={!isDirectory ? node.path : undefined}
           className={cn(
             "group flex cursor-pointer items-center gap-1.5 border-b border-[color-mix(in_srgb,var(--border-color)_35%,transparent)] py-[3px] pr-2 text-xs transition-colors",
             "hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)]",

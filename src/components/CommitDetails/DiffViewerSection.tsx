@@ -1,6 +1,13 @@
-import { useRef, useEffect, useCallback, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronDown, ChevronRight, FileCode } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import CodeMirrorDiffViewer from "./CodeMirrorDiffViewer";
 import { ChangedFile, DiffFileView, DiffViewResponse } from "../../types/git";
 
@@ -8,10 +15,14 @@ interface DiffViewerSectionProps {
   commitId: string;
   files: ChangedFile[];
   selectedFile?: string | null;
+  onActiveFileChange?: (filePath: string) => void;
   diffDisplayMode: "unified" | "split";
   contextLines: number;
   ignoreWhitespace: boolean;
 }
+
+const INITIAL_BATCH = 20;
+const APPEND_BATCH = 20;
 
 function fileMatchesSelection(file: DiffFileView, selectedFile: string): boolean {
   return (
@@ -21,23 +32,24 @@ function fileMatchesSelection(file: DiffFileView, selectedFile: string): boolean
   );
 }
 
-// GitHub-style file card header
-function FileHeader({
-  path,
-  additions,
-  deletions,
+function StackHeader({
   collapsed,
+  showing,
+  total,
   onToggle,
 }: {
-  path: string;
-  additions: number;
-  deletions: number;
   collapsed: boolean;
+  showing: number;
+  total: number;
   onToggle: () => void;
 }) {
-  const name = path.split("/").pop() ?? path;
-  const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
-  const mono = "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace";
+  const summary =
+    total === 0
+      ? "No changed files"
+      : showing >= total
+        ? `Showing all ${total} files`
+        : `Showing ${showing} / ${total} files`;
+
   return (
     <div
       onClick={onToggle}
@@ -57,49 +69,44 @@ function FileHeader({
       <span style={{ color: "var(--text-secondary)", display: "flex", alignItems: "center" }}>
         {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
       </span>
-      <FileCode size={13} style={{ color: "var(--text-secondary)", flexShrink: 0 }} />
       <span
         style={{
-          fontFamily: mono,
           fontSize: 12,
           color: "var(--text-primary)",
+          fontWeight: 600,
           flex: 1,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
         }}
       >
-        {dir ? <span style={{ color: "var(--text-secondary)" }}>{dir}/</span> : null}
-        {name}
+        Continuous Diff
       </span>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-        {additions > 0 ? (
-          <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 600, color: "var(--success)" }}>
-            +{additions}
-          </span>
-        ) : null}
-        {deletions > 0 ? (
-          <span style={{ fontFamily: mono, fontSize: 12, fontWeight: 600, color: "var(--danger)" }}>
-            -{deletions}
-          </span>
-        ) : null}
-      </div>
+      <span
+        style={{
+          fontFamily: "ui-monospace,SFMono-Regular,Menlo,Consolas,monospace",
+          fontSize: 11,
+          color: "var(--text-secondary)",
+        }}
+      >
+        {summary}
+      </span>
     </div>
   );
 }
 
-// Synchronized split view
 function SplitView({
-  diffFile,
+  diffFiles,
   loading,
   error,
+  leftRef,
+  rightRef,
+  sentinelRef,
 }: {
-  diffFile: DiffFileView | null;
+  diffFiles: DiffFileView[];
   loading: boolean;
   error: string | null;
+  leftRef: RefObject<HTMLDivElement>;
+  rightRef: RefObject<HTMLDivElement>;
+  sentinelRef: RefObject<HTMLDivElement>;
 }) {
-  const leftRef = useRef<HTMLDivElement>(null);
-  const rightRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
 
   const sync = useCallback(
@@ -121,7 +128,7 @@ function SplitView({
         syncing.current = false;
       });
     },
-    []
+    [leftRef, rightRef]
   );
 
   useEffect(() => {
@@ -141,7 +148,7 @@ function SplitView({
       left.removeEventListener("scroll", onLeft);
       right.removeEventListener("scroll", onRight);
     };
-  }, [sync]);
+  }, [leftRef, rightRef, sync]);
 
   return (
     <div style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -180,10 +187,12 @@ function SplitView({
         </div>
         <CodeMirrorDiffViewer
           ref={leftRef}
-          diffFile={diffFile}
+          diffFiles={diffFiles}
           loading={loading}
           error={error}
           viewMode="old"
+          alwaysShowFileHeaders
+          sentinelRef={sentinelRef}
         />
       </div>
       <div
@@ -220,13 +229,27 @@ function SplitView({
         </div>
         <CodeMirrorDiffViewer
           ref={rightRef}
-          diffFile={diffFile}
+          diffFiles={diffFiles}
           loading={loading}
           error={error}
           viewMode="new"
+          alwaysShowFileHeaders
         />
       </div>
     </div>
+  );
+}
+
+function findFileHeaderElement(
+  container: HTMLDivElement,
+  filePath: string
+): HTMLTableRowElement | null {
+  const headers = Array.from(
+    container.querySelectorAll<HTMLTableRowElement>("[data-diff-file-header='true']")
+  );
+
+  return (
+    headers.find((header) => header.dataset.diffFilePath === filePath) ?? null
   );
 }
 
@@ -234,68 +257,71 @@ export default function DiffViewerSection({
   commitId,
   files,
   selectedFile,
+  onActiveFileChange,
   diffDisplayMode,
   contextLines,
   ignoreWhitespace,
 }: DiffViewerSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [diffFile, setDiffFile] = useState<DiffFileView | null>(null);
+  const [allFiles, setAllFiles] = useState<DiffFileView[]>([]);
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [pendingScrollFile, setPendingScrollFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const currentFile = files.find((file) => file.path === selectedFile);
+
+  const unifiedRef = useRef<HTMLDivElement>(null);
+  const splitLeftRef = useRef<HTMLDivElement>(null);
+  const splitRightRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const suppressActiveSyncRef = useRef(false);
+  const autoSyncReleaseTimerRef = useRef<number | null>(null);
+  const lastAutoSyncedFileRef = useRef<string | null>(null);
+  const lastReportedActiveFileRef = useRef<string | null>(null);
+
+  const visibleFiles = useMemo(
+    () => allFiles.slice(0, visibleCount),
+    [allFiles, visibleCount]
+  );
+
+  const getPrimaryScrollContainer = useCallback((): HTMLDivElement | null => {
+    return diffDisplayMode === "unified" ? unifiedRef.current : splitLeftRef.current;
+  }, [diffDisplayMode]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSyncReleaseTimerRef.current !== null) {
+        window.clearTimeout(autoSyncReleaseTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!selectedFile) {
-      setDiffFile(null);
-      setLoading(false);
-      setError(null);
-      return () => {
-        cancelled = true;
-      };
-    }
-
     const loadDiff = async () => {
       setLoading(true);
       setError(null);
+      setAllFiles([]);
+      setVisibleCount(0);
+      setPendingScrollFile(null);
 
       try {
-        let response = await invoke<DiffViewResponse>("get_commit_diff_view", {
+        const response = await invoke<DiffViewResponse>("get_commit_diff_view", {
           oid: commitId,
           contextLines,
           ignoreWhitespace,
-          filePath: selectedFile,
         });
 
         if (cancelled) {
           return;
         }
 
-        let selectedDiffFile: DiffFileView | null =
-          response.files.find((file) => fileMatchesSelection(file, selectedFile)) ??
-          (response.files.length > 0 ? response.files[0] : null);
-
-        if (!selectedDiffFile) {
-          response = await invoke<DiffViewResponse>("get_commit_diff_view", {
-            oid: commitId,
-            contextLines,
-            ignoreWhitespace,
-          });
-
-          if (cancelled) {
-            return;
-          }
-
-          selectedDiffFile =
-            response.files.find((file) => fileMatchesSelection(file, selectedFile)) ??
-            null;
-        }
-
-        setDiffFile(selectedDiffFile);
+        setAllFiles(response.files);
+        setVisibleCount(Math.min(INITIAL_BATCH, response.files.length));
       } catch (err) {
         if (!cancelled) {
-          setDiffFile(null);
+          setAllFiles([]);
+          setVisibleCount(0);
           setError(String(err));
         }
       } finally {
@@ -310,25 +336,156 @@ export default function DiffViewerSection({
     return () => {
       cancelled = true;
     };
-  }, [commitId, selectedFile, contextLines, ignoreWhitespace]);
+  }, [commitId, contextLines, ignoreWhitespace]);
 
-  if (!selectedFile) {
-    return (
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--bg-primary)",
-        }}
-      >
-        <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-          Select a file to view diff
-        </span>
-      </div>
+  useEffect(() => {
+    if (!selectedFile || allFiles.length === 0) {
+      return;
+    }
+
+    if (selectedFile === lastAutoSyncedFileRef.current) {
+      return;
+    }
+
+    const targetIndex = allFiles.findIndex((file) =>
+      fileMatchesSelection(file, selectedFile)
     );
-  }
+
+    if (targetIndex < 0) {
+      return;
+    }
+
+    const requiredCount = Math.min(
+      allFiles.length,
+      Math.max(visibleCount, targetIndex + 1)
+    );
+    if (requiredCount !== visibleCount) {
+      setVisibleCount(requiredCount);
+    }
+
+    setPendingScrollFile(allFiles[targetIndex].path);
+  }, [allFiles, selectedFile, visibleCount]);
+
+  useEffect(() => {
+    if (!pendingScrollFile) {
+      return;
+    }
+
+    const container = getPrimaryScrollContainer();
+    if (!container) {
+      return;
+    }
+
+    const targetHeader = findFileHeaderElement(container, pendingScrollFile);
+    if (!targetHeader) {
+      return;
+    }
+
+    suppressActiveSyncRef.current = true;
+    targetHeader.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    if (autoSyncReleaseTimerRef.current !== null) {
+      window.clearTimeout(autoSyncReleaseTimerRef.current);
+    }
+    autoSyncReleaseTimerRef.current = window.setTimeout(() => {
+      suppressActiveSyncRef.current = false;
+    }, 450);
+
+    setPendingScrollFile(null);
+  }, [pendingScrollFile, getPrimaryScrollContainer, visibleFiles]);
+
+  useEffect(() => {
+    const container = getPrimaryScrollContainer();
+    const sentinel = sentinelRef.current;
+    if (!container || !sentinel) {
+      return;
+    }
+
+    if (visibleCount >= allFiles.length) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) {
+            continue;
+          }
+
+          setVisibleCount((current) =>
+            Math.min(allFiles.length, current + APPEND_BATCH)
+          );
+          break;
+        }
+      },
+      {
+        root: container,
+        rootMargin: "200px 0px",
+        threshold: 0.01,
+      }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [allFiles.length, getPrimaryScrollContainer, visibleCount]);
+
+  useEffect(() => {
+    const container = getPrimaryScrollContainer();
+    if (!container || !onActiveFileChange) {
+      return;
+    }
+
+    const detectActiveFile = () => {
+      if (suppressActiveSyncRef.current) {
+        return;
+      }
+
+      const headers = Array.from(
+        container.querySelectorAll<HTMLTableRowElement>(
+          "[data-diff-file-header='true']"
+        )
+      );
+      if (headers.length === 0) {
+        return;
+      }
+
+      const containerTop = container.getBoundingClientRect().top;
+      const activationTop = containerTop + 88;
+      let activePath: string | null = null;
+
+      for (const header of headers) {
+        const top = header.getBoundingClientRect().top;
+        if (top <= activationTop) {
+          activePath = header.dataset.diffFilePath ?? null;
+        } else {
+          break;
+        }
+      }
+
+      if (!activePath) {
+        activePath = headers[0].dataset.diffFilePath ?? null;
+      }
+
+      if (!activePath || activePath === lastReportedActiveFileRef.current) {
+        return;
+      }
+
+      lastReportedActiveFileRef.current = activePath;
+      lastAutoSyncedFileRef.current = activePath;
+      onActiveFileChange(activePath);
+    };
+
+    container.addEventListener("scroll", detectActiveFile, { passive: true });
+    const frameId = window.requestAnimationFrame(detectActiveFile);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      container.removeEventListener("scroll", detectActiveFile);
+    };
+  }, [getPrimaryScrollContainer, onActiveFileChange, visibleFiles]);
+
+  const totalFiles = allFiles.length > 0 ? allFiles.length : files.length;
+  const shownFiles = visibleFiles.length;
 
   return (
     <div
@@ -342,23 +499,33 @@ export default function DiffViewerSection({
         borderRadius: 6,
       }}
     >
-      <FileHeader
-        path={selectedFile}
-        additions={currentFile?.additions ?? 0}
-        deletions={currentFile?.deletions ?? 0}
+      <StackHeader
         collapsed={collapsed}
+        showing={shownFiles}
+        total={totalFiles}
         onToggle={() => setCollapsed((value) => !value)}
       />
+
       {!collapsed ? (
         diffDisplayMode === "unified" ? (
           <CodeMirrorDiffViewer
-            diffFile={diffFile}
+            ref={unifiedRef}
+            diffFiles={visibleFiles}
             loading={loading}
             error={error}
             viewMode="diff"
+            alwaysShowFileHeaders
+            sentinelRef={sentinelRef}
           />
         ) : (
-          <SplitView diffFile={diffFile} loading={loading} error={error} />
+          <SplitView
+            diffFiles={visibleFiles}
+            loading={loading}
+            error={error}
+            leftRef={splitLeftRef}
+            rightRef={splitRightRef}
+            sentinelRef={sentinelRef}
+          />
         )
       ) : null}
     </div>

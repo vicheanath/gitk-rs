@@ -1,14 +1,16 @@
-import { forwardRef } from "react";
+import { forwardRef, type RefObject } from "react";
 import { DiffFileView } from "../../types/git";
 import StructuredDiffTable, {
   StructuredDiffMode,
 } from "../Diff/StructuredDiffTable";
 
 export interface CodeMirrorDiffViewerProps {
-  diffFile: DiffFileView | null;
+  diffFiles: DiffFileView[];
   loading?: boolean;
   error?: string | null;
   viewMode?: "diff" | "old" | "new";
+  alwaysShowFileHeaders?: boolean;
+  sentinelRef?: RefObject<HTMLDivElement>;
 }
 
 const C = {
@@ -39,7 +41,14 @@ function fallbackMessage(viewMode: "diff" | "old" | "new"): string {
 
 const CodeMirrorDiffViewer = forwardRef<HTMLDivElement, CodeMirrorDiffViewerProps>(
   function CodeMirrorDiffViewer(
-    { diffFile, loading = false, error = null, viewMode = "diff" },
+    {
+      diffFiles,
+      loading = false,
+      error = null,
+      viewMode = "diff",
+      alwaysShowFileHeaders = false,
+      sentinelRef,
+    },
     scrollRef
   ) {
     if (loading) {
@@ -77,10 +86,12 @@ const CodeMirrorDiffViewer = forwardRef<HTMLDivElement, CodeMirrorDiffViewerProp
     return (
       <div ref={scrollRef} style={{ flex: 1, overflow: "auto", background: C.bg }}>
         <StructuredDiffTable
-          files={diffFile ? [diffFile] : []}
+          files={diffFiles}
           mode={mapMode(viewMode)}
           emptyMessage={fallbackMessage(viewMode)}
+          alwaysShowFileHeaders={alwaysShowFileHeaders}
         />
+        {sentinelRef ? <div ref={sentinelRef} style={{ height: 1 }} /> : null}
       </div>
     );
   }

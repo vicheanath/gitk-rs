@@ -53,6 +53,7 @@ export default function FileList({
         return (
           <li
             key={file.path}
+            data-file-path={file.path}
             className={cn(
               "group flex cursor-pointer items-center gap-2 border-b border-[color-mix(in_srgb,var(--border-color)_35%,transparent)] px-2 py-[3px] text-xs transition-colors",
               "hover:bg-[color-mix(in_srgb,var(--bg-tertiary)_55%,transparent)]",

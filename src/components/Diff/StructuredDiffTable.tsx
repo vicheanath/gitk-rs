@@ -7,6 +7,7 @@ interface StructuredDiffTableProps {
   files: DiffFileView[];
   mode: StructuredDiffMode;
   emptyMessage?: string;
+  alwaysShowFileHeaders?: boolean;
 }
 
 const C = {
@@ -145,6 +146,7 @@ export default function StructuredDiffTable({
   files,
   mode,
   emptyMessage = "No changed lines for current context.",
+  alwaysShowFileHeaders = false,
 }: StructuredDiffTableProps) {
   if (files.length === 0) {
     return (
@@ -171,13 +173,17 @@ export default function StructuredDiffTable({
                 .filter((hunk) => hunk.lines.length > 0);
 
           const hasRenderableLines = hunks.some((hunk) => hunk.lines.length > 0);
-          const showFileHeader = files.length > 1;
+          const showFileHeader = alwaysShowFileHeaders || files.length > 1;
           const colspan = renderUnified ? 4 : 3;
 
           return (
             <Fragment key={`${file.path}:${fileIndex}`}>
               {showFileHeader ? (
-                <tr style={{ background: C.fileBg }}>
+                <tr
+                  style={{ background: C.fileBg }}
+                  data-diff-file-header="true"
+                  data-diff-file-path={file.path}
+                >
                   <td
                     colSpan={colspan}
                     style={{
