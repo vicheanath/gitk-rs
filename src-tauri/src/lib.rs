@@ -83,9 +83,18 @@ fn build_native_menu<R: Runtime, M: Manager<R>>(
 }
 
 pub fn run() {
+    let mut updater_builder = tauri_plugin_updater::Builder::new();
+    if let Some(pubkey) = option_env!("TAURI_UPDATER_PUBLIC_KEY")
+        .map(str::trim)
+        .filter(|key| !key.is_empty())
+    {
+        // Prefer compile-time injected updater key (CI secret) over tauri.conf.
+        updater_builder = updater_builder.pubkey(pubkey);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(updater_builder.build())
         .invoke_handler(tauri::generate_handler![
             commands::open_repository,
             commands::get_commit_graph,
@@ -117,6 +126,7 @@ pub fn run() {
             commands::list_provider_repositories,
             commands::clone_repository,
             commands::open_url,
+            commands::request_app_restart,
         ])
         .setup(|app| {
             let menu = build_native_menu(app)?;

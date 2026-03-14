@@ -29,6 +29,9 @@ import { cn } from "./lib/utils";
 import "./styles/App.css";
 import "./styles/CommitGraphList.css";
 
+const AUTO_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const DISMISSED_UPDATE_VERSION_KEY = "gitk-rs-dismissed-update-version";
+
 function App() {
   const {
     repoPath,
@@ -64,6 +67,8 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [connections, setConnections] = useState<AuthConnection[]>([]);
   const searchBarRef = useRef<SearchBarRef>(null);
+  const updateCheckInProgressRef = useRef(false);
+  const updateInstallInProgressRef = useRef(false);
 
   const { openTabs, activeTab, selectCommitFromGraph, activateTab, closeTab } =
     useEditorTabsViewModel({
@@ -96,39 +101,77 @@ function App() {
   useEffect(() => {
     const isTauri =
       typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-    if (!isTauri) return;
+    if (!isTauri) {
+      return;
+    }
 
     let cancelled = false;
+    let intervalId: number | null = null;
 
     const checkForUpdates = async () => {
+      if (
+        cancelled ||
+        updateCheckInProgressRef.current ||
+        updateInstallInProgressRef.current
+      ) {
+        return;
+      }
+
+      updateCheckInProgressRef.current = true;
+
       try {
         const update = await check();
         if (!update || cancelled) {
           return;
         }
 
-        const shouldInstall = window.confirm(
-          `A new version (${update.version}) is available. Install update now?`
+        const dismissedVersion = localStorage.getItem(
+          DISMISSED_UPDATE_VERSION_KEY
         );
-        if (!shouldInstall || cancelled) {
+        if (dismissedVersion === update.version) {
           return;
         }
 
-        await update.downloadAndInstall();
+        const shouldInstall = window.confirm(
+          `A new version (${update.version}) is available. Download, install, and restart now?`
+        );
+        if (!shouldInstall || cancelled) {
+          localStorage.setItem(DISMISSED_UPDATE_VERSION_KEY, update.version);
+          return;
+        }
+
+        updateInstallInProgressRef.current = true;
+        localStorage.removeItem(DISMISSED_UPDATE_VERSION_KEY);
+
+        await update.downloadAndInstall((event) => {
+          if (event.event === "Started") {
+            console.info("[updater] Download started");
+          } else if (event.event === "Finished") {
+            console.info("[updater] Download finished");
+          }
+        });
+
         if (!cancelled) {
-          window.alert(
-            "Update installed successfully. Please restart GitK-RS to use the latest version."
-          );
+          await invoke("request_app_restart");
         }
       } catch (error) {
         console.warn("Auto-update check failed:", error);
+      } finally {
+        updateCheckInProgressRef.current = false;
+        updateInstallInProgressRef.current = false;
       }
     };
 
     void checkForUpdates();
+    intervalId = window.setInterval(() => {
+      void checkForUpdates();
+    }, AUTO_UPDATE_CHECK_INTERVAL_MS);
 
     return () => {
       cancelled = true;
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
     };
   }, []);
 

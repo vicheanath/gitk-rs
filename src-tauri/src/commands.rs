@@ -853,6 +853,12 @@ pub fn open_url(url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn request_app_restart(app_handle: tauri::AppHandle) -> Result<(), String> {
+    app_handle.request_restart();
+    Ok(())
+}
+
+#[tauri::command]
 pub fn list_provider_repositories(
     connection_id: String,
     query: Option<String>,
