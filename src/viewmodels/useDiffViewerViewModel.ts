@@ -60,31 +60,54 @@ export function useDiffViewerViewModel({
 
       try {
         if (viewMode === "diff") {
-          const diffText = await invoke<string>("get_diff", {
-            oid: commitId,
-            contextLines,
-            ignoreWhitespace,
-          });
+          let diffText = "";
+
+          if (selectedFile && !showAllFilesInDiff) {
+            diffText = await invoke<string>("get_diff", {
+              oid: commitId,
+              contextLines,
+              ignoreWhitespace,
+              filePath: selectedFile,
+            });
+          } else {
+            diffText = await invoke<string>("get_diff", {
+              oid: commitId,
+              contextLines,
+              ignoreWhitespace,
+            });
+          }
 
           if (cancelled) {
             return;
           }
 
-          if (!diffText || diffText.trim().length === 0) {
-            setContent("No changes in this commit (empty diff)");
-            return;
-          }
+          let nextContent = diffText;
+          if (selectedFile && !showAllFilesInDiff && (!diffText || diffText.trim().length === 0)) {
+            // Fallback path for edge cases where pathspec diff returns empty.
+            const fullDiffText = await invoke<string>("get_diff", {
+              oid: commitId,
+              contextLines,
+              ignoreWhitespace,
+            });
 
-          const sections = splitDiffSections(diffText);
+            if (cancelled) {
+              return;
+            }
 
-          let nextContent = sections.join("\n\n") || "No diff content available";
-          if (selectedFile && !showAllFilesInDiff) {
+            const sections = splitDiffSections(fullDiffText);
             const matched = sections.filter((section) =>
               sectionMatchesFile(section, selectedFile)
             );
             if (matched.length > 0) {
               nextContent = matched.join("\n\n");
+            } else {
+              nextContent = fullDiffText;
             }
+          }
+
+          if (!nextContent || nextContent.trim().length === 0) {
+            setContent("No changes in this commit (empty diff)");
+            return;
           }
 
           setContent(nextContent);
@@ -163,13 +186,33 @@ export function useDiffViewerViewModel({
 
         // For selected-file old/new views, derive changed line numbers to apply diff colors in code view.
         if (selectedFile && targetFiles.length === 1 && selectedFileContentLoaded) {
-          const diffText = await invoke<string>("get_diff", {
+          const diffTextForSelectedFile = await invoke<string>("get_diff", {
             oid: commitId,
             contextLines,
             ignoreWhitespace,
+            filePath: selectedFile,
           });
+
           if (!cancelled) {
-            const lineInfo = getChangedLineNumbersForFile(diffText, selectedFile);
+            let lineInfo = getChangedLineNumbersFromDiff(diffTextForSelectedFile);
+
+            if (
+              !diffTextForSelectedFile ||
+              diffTextForSelectedFile.trim().length === 0
+            ) {
+              const fullDiffText = await invoke<string>("get_diff", {
+                oid: commitId,
+                contextLines,
+                ignoreWhitespace,
+              });
+
+              if (cancelled) {
+                return;
+              }
+
+              lineInfo = getChangedLineNumbersForFile(fullDiffText, selectedFile);
+            }
+
             setOldChangedLines(lineInfo.oldChangedLines);
             setNewChangedLines(lineInfo.newChangedLines);
           }
@@ -448,8 +491,9 @@ function sectionMatchesFile(section: string, filePath: string): boolean {
   const escapedPath = filePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const patterns = [
     new RegExp(`^diff --git\\s+a/${escapedPath}\\s+b/${escapedPath}`, "m"),
-    new RegExp(`^diff --git.*\\b${escapedPath}\\b`, "m"),
+    new RegExp(`^diff --git\\s+.*(?:a|b)/${escapedPath}(?:\\s|$)`, "m"),
     new RegExp(`^[+-]{3} [ab]/${escapedPath}`, "m"),
+    new RegExp(`^[+-]{3} "[ab]/${escapedPath}"`, "m"),
     new RegExp(`^=== ${escapedPath} ===$`, "m"),
   ];
 
@@ -467,9 +511,20 @@ function getChangedLineNumbersForFile(diffText: string, filePath: string): {
     return { oldChangedLines: [], newChangedLines: [] };
   }
 
+  return getChangedLineNumbersFromDiff(targetSection);
+}
+
+function getChangedLineNumbersFromDiff(diffText: string): {
+  oldChangedLines: number[];
+  newChangedLines: number[];
+} {
+  if (!diffText || diffText.trim().length === 0) {
+    return { oldChangedLines: [], newChangedLines: [] };
+  }
+
   const oldChangedLines = new Set<number>();
   const newChangedLines = new Set<number>();
-  const lines = targetSection.split("\n");
+  const lines = diffText.split("\n");
 
   let oldLine = 0;
   let newLine = 0;

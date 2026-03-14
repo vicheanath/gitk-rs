@@ -417,6 +417,10 @@ pub fn search_commits(repo: &Repository, query: &str, max_results: usize) -> any
     Ok(results)
 }
 
+fn is_descendant_or_same(repo: &Repository, descendant: git2::Oid, ancestor: git2::Oid) -> bool {
+    descendant == ancestor || repo.graph_descendant_of(descendant, ancestor).unwrap_or(false)
+}
+
 /// Get all branches that contain the given commit
 pub fn get_branches_containing_commit(repo: &Repository, commit_id: &str) -> anyhow::Result<Vec<String>> {
     let commit_oid = git2::Oid::from_str(commit_id)?;
@@ -428,20 +432,8 @@ pub fn get_branches_containing_commit(repo: &Repository, commit_id: &str) -> any
         let branch_name = branch.name()?.unwrap_or("").to_string();
         
         if let Ok(branch_commit) = branch.get().peel_to_commit() {
-            // Check if the commit is reachable from this branch
-            if let Ok(_) = repo.merge_base(branch_commit.id(), commit_oid) {
-                // If merge_base succeeds, check if commit is actually in the branch history
-                let mut revwalk = repo.revwalk()?;
-                revwalk.push(branch_commit.id())?;
-                
-                for oid in revwalk {
-                    if let Ok(oid) = oid {
-                        if oid == commit_oid {
-                            branches.push(branch_name);
-                            break;
-                        }
-                    }
-                }
+            if is_descendant_or_same(repo, branch_commit.id(), commit_oid) {
+                branches.push(branch_name);
             }
         }
     }
@@ -452,18 +444,8 @@ pub fn get_branches_containing_commit(repo: &Repository, commit_id: &str) -> any
         let branch_name = branch.name()?.unwrap_or("").to_string();
         
         if let Ok(branch_commit) = branch.get().peel_to_commit() {
-            if let Ok(_) = repo.merge_base(branch_commit.id(), commit_oid) {
-                let mut revwalk = repo.revwalk()?;
-                revwalk.push(branch_commit.id())?;
-                
-                for oid in revwalk {
-                    if let Ok(oid) = oid {
-                        if oid == commit_oid {
-                            branches.push(branch_name);
-                            break;
-                        }
-                    }
-                }
+            if is_descendant_or_same(repo, branch_commit.id(), commit_oid) {
+                branches.push(branch_name);
             }
         }
     }
@@ -471,74 +453,68 @@ pub fn get_branches_containing_commit(repo: &Repository, commit_id: &str) -> any
     Ok(branches)
 }
 
-/// Get tags that precede (come before) the given commit
-pub fn get_tags_preceding_commit(repo: &Repository, commit_id: &str) -> anyhow::Result<Vec<String>> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelatedTags {
+    pub preceding: Vec<String>,
+    pub following: Vec<String>,
+}
+
+/// Get tags that precede and follow the given commit in one pass.
+pub fn get_related_tags_for_commit(
+    repo: &Repository,
+    commit_id: &str,
+) -> anyhow::Result<RelatedTags> {
     let commit_oid = git2::Oid::from_str(commit_id)?;
     let commit = repo.find_commit(commit_oid)?;
     let commit_time = commit.time().seconds();
-    let mut preceding_tags = Vec::new();
-    
+    let mut preceding = Vec::new();
+    let mut following = Vec::new();
+
     repo.tag_foreach(|tag_id, name| {
         let name_str = String::from_utf8_lossy(name);
-        let tag_name = name_str.strip_prefix("refs/tags/").unwrap_or(&name_str).to_string();
-        
-        if let Ok(tag) = repo.find_tag(tag_id) {
-            if let Ok(tag_commit) = repo.find_commit(tag.target_id()) {
-                // Tag is before commit if its time is earlier
-                if tag_commit.time().seconds() < commit_time {
-                    // Check if tag is actually in the commit's history
-                    if let Ok(_) = repo.merge_base(commit_oid, tag.target_id()) {
-                        preceding_tags.push(tag_name);
-                    }
-                }
-            }
-        } else if let Ok(tag_commit) = repo.find_commit(tag_id) {
-            if tag_commit.time().seconds() < commit_time {
-                if let Ok(_) = repo.merge_base(commit_oid, tag_id) {
-                    preceding_tags.push(tag_name);
-                }
-            }
+        let tag_ref = name_str.as_ref();
+        let tag_name = tag_ref
+            .strip_prefix("refs/tags/")
+            .unwrap_or(tag_ref)
+            .to_string();
+
+        let tag_commit = match repo
+            .find_object(tag_id, None)
+            .ok()
+            .and_then(|obj| obj.peel_to_commit().ok())
+        {
+            Some(commit) => commit,
+            None => return true,
+        };
+
+        let tag_oid = tag_commit.id();
+        let tag_time = tag_commit.time().seconds();
+
+        if tag_time < commit_time && is_descendant_or_same(repo, commit_oid, tag_oid) {
+            preceding.push(tag_name);
+        } else if tag_time > commit_time && is_descendant_or_same(repo, tag_oid, commit_oid) {
+            following.push(tag_name);
         }
-        
+
         true
     })?;
-    
-    Ok(preceding_tags)
+
+    Ok(RelatedTags {
+        preceding,
+        following,
+    })
+}
+
+/// Get tags that precede (come before) the given commit
+#[cfg(test)]
+pub fn get_tags_preceding_commit(repo: &Repository, commit_id: &str) -> anyhow::Result<Vec<String>> {
+    Ok(get_related_tags_for_commit(repo, commit_id)?.preceding)
 }
 
 /// Get tags that follow (come after) the given commit
+#[cfg(test)]
 pub fn get_tags_following_commit(repo: &Repository, commit_id: &str) -> anyhow::Result<Vec<String>> {
-    let commit_oid = git2::Oid::from_str(commit_id)?;
-    let commit = repo.find_commit(commit_oid)?;
-    let commit_time = commit.time().seconds();
-    let mut following_tags = Vec::new();
-    
-    repo.tag_foreach(|tag_id, name| {
-        let name_str = String::from_utf8_lossy(name);
-        let tag_name = name_str.strip_prefix("refs/tags/").unwrap_or(&name_str).to_string();
-        
-        if let Ok(tag) = repo.find_tag(tag_id) {
-            if let Ok(tag_commit) = repo.find_commit(tag.target_id()) {
-                // Tag is after commit if its time is later
-                if tag_commit.time().seconds() > commit_time {
-                    // Check if commit is in the tag's history
-                    if let Ok(_) = repo.merge_base(tag.target_id(), commit_oid) {
-                        following_tags.push(tag_name);
-                    }
-                }
-            }
-        } else if let Ok(tag_commit) = repo.find_commit(tag_id) {
-            if tag_commit.time().seconds() > commit_time {
-                if let Ok(_) = repo.merge_base(tag_id, commit_oid) {
-                    following_tags.push(tag_name);
-                }
-            }
-        }
-        
-        true
-    })?;
-    
-    Ok(following_tags)
+    Ok(get_related_tags_for_commit(repo, commit_id)?.following)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -779,6 +755,32 @@ mod tests {
     }
 
     #[test]
+    fn branches_containing_commit_reports_expected_membership() {
+        let repo = init_repo("branches-membership");
+        let c1 = commit_file(&repo, "a.txt", "one", "initial commit");
+        let c2 = commit_file(&repo, "a.txt", "two", "second commit");
+        let current_branch = repo
+            .head()
+            .ok()
+            .and_then(|head| head.shorthand().map(str::to_string))
+            .expect("current branch");
+
+        let first_commit = repo.find_commit(c1).expect("commit c1");
+        repo.branch("feature/base", &first_commit, false)
+            .expect("create feature branch");
+
+        let containing_first = get_branches_containing_commit(&repo, &c1.to_string())
+            .expect("branches containing c1");
+        let containing_second = get_branches_containing_commit(&repo, &c2.to_string())
+            .expect("branches containing c2");
+
+        assert!(containing_first.iter().any(|name| name == &current_branch));
+        assert!(containing_first.iter().any(|name| name == "feature/base"));
+        assert!(containing_second.iter().any(|name| name == &current_branch));
+        assert!(!containing_second.iter().any(|name| name == "feature/base"));
+    }
+
+    #[test]
     fn get_tags_includes_lightweight_and_annotated() {
         let repo = init_repo("tags-kinds");
         let c1 = commit_file(&repo, "a.txt", "one", "initial commit");
@@ -829,5 +831,44 @@ mod tests {
         assert!(preceding.iter().any(|t| t == "v1.0.0"));
         assert!(following.iter().any(|t| t == "v1.1.0"));
     }
-}
 
+    #[test]
+    fn related_tags_matches_individual_helpers() {
+        let repo = init_repo("tags-related");
+        let c1 = commit_file_at_time(&repo, "a.txt", "one", "first", 1_700_001_000);
+        let c2 = commit_file_at_time(&repo, "a.txt", "two", "second", 1_700_001_100);
+        let c3 = commit_file_at_time(&repo, "a.txt", "three", "third", 1_700_001_200);
+
+        let c1_obj = repo
+            .find_commit(c1)
+            .expect("commit c1")
+            .into_object();
+        let c3_obj = repo
+            .find_commit(c3)
+            .expect("commit c3")
+            .into_object();
+        let sig = Signature::now("Test", "test@example.com").expect("signature");
+
+        repo.tag("v2.0.0", &c1_obj, &sig, "old", false)
+            .expect("tag v2.0.0");
+        repo.tag("v2.1.0", &c3_obj, &sig, "new", false)
+            .expect("tag v2.1.0");
+
+        let related = get_related_tags_for_commit(&repo, &c2.to_string())
+            .expect("related tags");
+        let mut preceding = get_tags_preceding_commit(&repo, &c2.to_string())
+            .expect("preceding tags");
+        let mut following = get_tags_following_commit(&repo, &c2.to_string())
+            .expect("following tags");
+
+        let mut related_preceding = related.preceding.clone();
+        let mut related_following = related.following.clone();
+        related_preceding.sort();
+        related_following.sort();
+        preceding.sort();
+        following.sort();
+
+        assert_eq!(related_preceding, preceding);
+        assert_eq!(related_following, following);
+    }
+}

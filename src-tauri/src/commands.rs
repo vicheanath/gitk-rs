@@ -149,10 +149,8 @@ pub fn get_commit_details(oid: String) -> Result<CommitDetails, String> {
     let branches = crate::git_engine::operations::get_branches_containing_commit(&repo, &oid)
         .map_err(|e| e.to_string())?;
     
-    // Get tags that precede and follow this commit
-    let follows_tags = crate::git_engine::operations::get_tags_preceding_commit(&repo, &oid)
-        .map_err(|e| e.to_string())?;
-    let precedes_tags = crate::git_engine::operations::get_tags_following_commit(&repo, &oid)
+    // Get tags that precede and follow this commit in one pass.
+    let related_tags = crate::git_engine::operations::get_related_tags_for_commit(&repo, &oid)
         .map_err(|e| e.to_string())?;
     
     let mut files = Vec::new();
@@ -225,8 +223,8 @@ pub fn get_commit_details(oid: String) -> Result<CommitDetails, String> {
         time: author.when().seconds(),
         files,
         branches,
-        follows_tags,
-        precedes_tags,
+        follows_tags: related_tags.preceding,
+        precedes_tags: related_tags.following,
     };
 
     // Store in cache for future calls.
@@ -249,6 +247,7 @@ pub fn get_diff(
     oid: String,
     context_lines: Option<usize>,
     ignore_whitespace: Option<bool>,
+    file_path: Option<String>,
 ) -> Result<String, String> {
     let repo = get_repo()?;
     let commit_oid = git2::Oid::from_str(&oid).map_err(|e| e.to_string())?;
@@ -263,6 +262,9 @@ pub fn get_diff(
     }
     if ignore_whitespace.unwrap_or(false) {
         diff_opts.ignore_whitespace(true);
+    }
+    if let Some(path) = file_path.as_deref() {
+        diff_opts.pathspec(path);
     }
 
     let diff = if let Ok(parent) = commit.parent(0) {
