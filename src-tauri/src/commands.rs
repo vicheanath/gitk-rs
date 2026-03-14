@@ -5,6 +5,7 @@ use crate::git_engine::{build_commit_graph, CommitNode};
 use git2::Repository;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -23,26 +24,265 @@ fn get_cache() -> &'static SqliteCache {
 
 fn get_repo() -> Result<Repository, String> {
     let state = APP_STATE.lock().unwrap();
-    let state = state.as_ref().ok_or_else(|| "No repository open".to_string())?;
+    let state = state
+        .as_ref()
+        .ok_or_else(|| "No repository open".to_string())?;
     let state = state.lock().unwrap();
-    let path = state.repo_path.as_ref().ok_or_else(|| "No repository path".to_string())?;
+    let path = state
+        .repo_path
+        .as_ref()
+        .ok_or_else(|| "No repository path".to_string())?;
     open_repo(path).map_err(|e| e.to_string())
+}
+
+fn diff_status_to_string(status: git2::Delta) -> String {
+    match status {
+        git2::Delta::Added => "added",
+        git2::Delta::Deleted => "deleted",
+        git2::Delta::Modified => "modified",
+        git2::Delta::Renamed => "renamed",
+        git2::Delta::Copied => "copied",
+        git2::Delta::Typechange => "typechange",
+        git2::Delta::Untracked => "untracked",
+        git2::Delta::Unreadable => "unreadable",
+        git2::Delta::Ignored => "ignored",
+        git2::Delta::Unmodified => "unmodified",
+        git2::Delta::Conflicted => "conflicted",
+    }
+    .to_string()
+}
+
+fn normalize_diff_text(content: &[u8]) -> String {
+    let mut text = String::from_utf8_lossy(content).to_string();
+
+    if text.ends_with('\n') {
+        text.pop();
+        if text.ends_with('\r') {
+            text.pop();
+        }
+    }
+
+    text
+}
+
+fn map_diff_line_kind(origin: char) -> Option<DiffLineKind> {
+    match origin {
+        ' ' | '=' => Some(DiffLineKind::Context),
+        '+' => Some(DiffLineKind::Add),
+        '-' => Some(DiffLineKind::Remove),
+        '>' => Some(DiffLineKind::Add),
+        '<' => Some(DiffLineKind::Remove),
+        '\\' => Some(DiffLineKind::NoNewline),
+        _ => None,
+    }
+}
+
+fn ensure_current_hunk<'a>(
+    file: &'a mut DiffFileView,
+    hunk: Option<&git2::DiffHunk<'_>>,
+) -> &'a mut DiffHunkView {
+    if file.hunks.is_empty() {
+        let header = hunk
+            .map(|value| normalize_diff_text(value.header()))
+            .unwrap_or_default();
+        file.hunks.push(DiffHunkView {
+            header,
+            lines: Vec::new(),
+        });
+    }
+
+    file.hunks.last_mut().expect("hunk must exist")
+}
+
+fn build_diff_view_response(diff: &git2::Diff<'_>) -> Result<DiffViewResponse, String> {
+    let files: RefCell<Vec<DiffFileView>> = RefCell::new(Vec::new());
+    let current_file_index: Cell<Option<usize>> = Cell::new(None);
+
+    diff.foreach(
+        &mut |delta, _| {
+            let old_path = delta
+                .old_file()
+                .path()
+                .map(|p| p.to_string_lossy().to_string());
+            let new_path = delta
+                .new_file()
+                .path()
+                .map(|p| p.to_string_lossy().to_string());
+            let canonical_path = new_path
+                .as_ref()
+                .or(old_path.as_ref())
+                .cloned()
+                .unwrap_or_default();
+            let same_paths = old_path == new_path;
+
+            let mut files_ref = files.borrow_mut();
+            files_ref.push(DiffFileView {
+                path: canonical_path,
+                old_path: if same_paths { None } else { old_path },
+                new_path: if same_paths { None } else { new_path },
+                status: diff_status_to_string(delta.status()),
+                is_binary: delta.flags().contains(git2::DiffFlags::BINARY),
+                hunks: Vec::new(),
+                meta: Vec::new(),
+            });
+            current_file_index.set(Some(files_ref.len().saturating_sub(1)));
+            true
+        },
+        None,
+        Some(&mut |_delta, hunk| {
+            if let Some(file_index) = current_file_index.get() {
+                let mut files_ref = files.borrow_mut();
+                let Some(file) = files_ref.get_mut(file_index) else {
+                    return true;
+                };
+                file.hunks.push(DiffHunkView {
+                    header: normalize_diff_text(hunk.header()),
+                    lines: Vec::new(),
+                });
+            }
+            true
+        }),
+        Some(&mut |_delta, hunk, line| {
+            let Some(file_index) = current_file_index.get() else {
+                return true;
+            };
+            let mut files_ref = files.borrow_mut();
+            let Some(file) = files_ref.get_mut(file_index) else {
+                return true;
+            };
+
+            let origin = line.origin();
+            if let Some(kind) = map_diff_line_kind(origin) {
+                let mut text = normalize_diff_text(line.content());
+                if kind == DiffLineKind::NoNewline && text.starts_with("\\ ") {
+                    text = text.replacen("\\ ", "", 1);
+                }
+
+                let target_hunk = ensure_current_hunk(file, hunk.as_ref());
+                target_hunk.lines.push(DiffLineView {
+                    kind,
+                    old_line: line.old_lineno(),
+                    new_line: line.new_lineno(),
+                    text,
+                });
+
+                if origin == '>' || origin == '<' {
+                    target_hunk.lines.push(DiffLineView {
+                        kind: DiffLineKind::NoNewline,
+                        old_line: line.old_lineno(),
+                        new_line: line.new_lineno(),
+                        text: "No newline at end of file".to_string(),
+                    });
+                }
+                return true;
+            }
+
+            // Ignore hunk header lines here; they are handled by the hunk callback.
+            if origin == 'H' {
+                return true;
+            }
+
+            let text = normalize_diff_text(line.content());
+            if !text.is_empty() {
+                file.meta.push(text);
+            }
+
+            true
+        }),
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(DiffViewResponse {
+        files: files.into_inner(),
+    })
+}
+
+fn get_commit_diff_view_for_repo(
+    repo: &Repository,
+    oid: &str,
+    context_lines: Option<usize>,
+    ignore_whitespace: Option<bool>,
+    file_path: Option<&str>,
+) -> Result<DiffViewResponse, String> {
+    let commit_oid = git2::Oid::from_str(oid).map_err(|e| e.to_string())?;
+    let commit = repo.find_commit(commit_oid).map_err(|e| e.to_string())?;
+    let tree = commit.tree().map_err(|e| e.to_string())?;
+
+    let mut diff_opts = git2::DiffOptions::new();
+    if let Some(context) = context_lines {
+        diff_opts.context_lines(context as u32);
+    }
+    if ignore_whitespace.unwrap_or(false) {
+        diff_opts.ignore_whitespace(true);
+    }
+    if let Some(path) = file_path {
+        diff_opts.pathspec(path);
+    }
+
+    let diff = if let Ok(parent) = commit.parent(0) {
+        let parent_tree = parent.tree().map_err(|e| e.to_string())?;
+        repo.diff_tree_to_tree(Some(&parent_tree), Some(&tree), Some(&mut diff_opts))
+    } else {
+        repo.diff_tree_to_tree(None, Some(&tree), Some(&mut diff_opts))
+    }
+    .map_err(|e| e.to_string())?;
+
+    build_diff_view_response(&diff)
+}
+
+fn get_working_tree_diff_view_for_repo(
+    repo: &Repository,
+    path: Option<&str>,
+    staged: bool,
+    context_lines: Option<usize>,
+    ignore_whitespace: Option<bool>,
+) -> Result<DiffViewResponse, String> {
+    let mut diff_opts = git2::DiffOptions::new();
+    if let Some(path) = path {
+        diff_opts.pathspec(path);
+    }
+    if let Some(context) = context_lines {
+        diff_opts.context_lines(context as u32);
+    }
+    if ignore_whitespace.unwrap_or(false) {
+        diff_opts.ignore_whitespace(true);
+    }
+
+    let diff = if staged {
+        let index = repo.index().map_err(|e| e.to_string())?;
+        match repo.head() {
+            Ok(head) => {
+                let tree = head.peel_to_tree().map_err(|e| e.to_string())?;
+                repo.diff_tree_to_index(Some(&tree), Some(&index), Some(&mut diff_opts))
+            }
+            Err(_) => repo.diff_tree_to_index(None, Some(&index), Some(&mut diff_opts)),
+        }
+    } else {
+        let index = repo.index().map_err(|e| e.to_string())?;
+        repo.diff_index_to_workdir(Some(&index), Some(&mut diff_opts))
+    }
+    .map_err(|e| e.to_string())?;
+
+    build_diff_view_response(&diff)
 }
 
 #[tauri::command]
 pub fn open_repository(path: String) -> Result<(), String> {
     let repo_path = PathBuf::from(&path);
-    
+
     // Validate path exists
     if !repo_path.exists() {
         return Err(format!("Path does not exist: {}", path));
     }
-    
+
     // Try to open the repository
     let repo = open_repo(&repo_path).map_err(|e| {
-        format!("Failed to open Git repository at '{}': {}. Make sure this is a valid Git repository.", path, e)
+        format!(
+            "Failed to open Git repository at '{}': {}. Make sure this is a valid Git repository.",
+            path, e
+        )
     })?;
-    
+
     // Bare repositories do not have a worktree and are not supported by this UI.
     if repo.is_bare() {
         return Err(format!(
@@ -50,12 +290,15 @@ pub fn open_repository(path: String) -> Result<(), String> {
             path
         ));
     }
-    
+
     let state = Arc::new(Mutex::new(AppState {
         repo_path: Some(repo_path.clone()),
-        active_branch: repo.head().ok().and_then(|h| h.shorthand().map(|s| s.to_string())),
+        active_branch: repo
+            .head()
+            .ok()
+            .and_then(|h| h.shorthand().map(|s| s.to_string())),
     }));
-    
+
     *APP_STATE.lock().unwrap() = Some(state);
 
     Ok(())
@@ -92,16 +335,23 @@ pub fn get_commit_graph(max_commits: Option<usize>) -> Result<CommitGraphRespons
     // Cache miss: build graph from git history.
     let graph = build_commit_graph(&repo, Some(limit)).map_err(|e| e.to_string())?;
 
-    let nodes: Vec<CommitNode> = graph.graph.node_indices()
+    let nodes: Vec<CommitNode> = graph
+        .graph
+        .node_indices()
         .map(|idx| graph.graph[idx].clone())
         .collect();
 
-    let edges: Vec<GraphEdge> = graph.graph.edge_indices()
+    let edges: Vec<GraphEdge> = graph
+        .graph
+        .edge_indices()
         .filter_map(|edge| {
-            graph.graph.edge_endpoints(edge).map(|(from, to)| GraphEdge {
-                from: graph.graph[from].id.clone(),
-                to: graph.graph[to].id.clone(),
-            })
+            graph
+                .graph
+                .edge_endpoints(edge)
+                .map(|(from, to)| GraphEdge {
+                    from: graph.graph[from].id.clone(),
+                    to: graph.graph[to].id.clone(),
+                })
         })
         .collect();
 
@@ -141,18 +391,18 @@ pub fn get_commit_details(oid: String) -> Result<CommitDetails, String> {
     let repo = get_repo()?;
     let commit_oid = git2::Oid::from_str(&oid).map_err(|e| e.to_string())?;
     let commit = repo.find_commit(commit_oid).map_err(|e| e.to_string())?;
-    
+
     let author = commit.author();
     let committer = commit.committer();
-    
+
     // Get branches containing this commit
     let branches = crate::git_engine::operations::get_branches_containing_commit(&repo, &oid)
         .map_err(|e| e.to_string())?;
-    
+
     // Get tags that precede and follow this commit in one pass.
     let related_tags = crate::git_engine::operations::get_related_tags_for_commit(&repo, &oid)
         .map_err(|e| e.to_string())?;
-    
+
     let mut files = Vec::new();
     let mut file_stats: HashMap<String, (i32, i32)> = HashMap::new();
     let tree = commit.tree().map_err(|e| e.to_string())?;
@@ -211,7 +461,7 @@ pub fn get_commit_details(oid: String) -> Result<CommitDetails, String> {
             file.deletions = *deletions;
         }
     }
-    
+
     let details = CommitDetails {
         id: commit.id().to_string(),
         parents: commit.parent_ids().map(|id| id.to_string()).collect(),
@@ -252,7 +502,7 @@ pub fn get_diff(
     let repo = get_repo()?;
     let commit_oid = git2::Oid::from_str(&oid).map_err(|e| e.to_string())?;
     let commit = repo.find_commit(commit_oid).map_err(|e| e.to_string())?;
-    
+
     let tree = commit.tree().map_err(|e| e.to_string())?;
 
     // Configure diff options
@@ -289,6 +539,23 @@ pub fn get_diff(
 }
 
 #[tauri::command]
+pub fn get_commit_diff_view(
+    oid: String,
+    context_lines: Option<usize>,
+    ignore_whitespace: Option<bool>,
+    file_path: Option<String>,
+) -> Result<DiffViewResponse, String> {
+    let repo = get_repo()?;
+    get_commit_diff_view_for_repo(
+        &repo,
+        &oid,
+        context_lines,
+        ignore_whitespace,
+        file_path.as_deref(),
+    )
+}
+
+#[tauri::command]
 pub fn get_file_content(
     oid: String,
     file_path: String,
@@ -297,7 +564,7 @@ pub fn get_file_content(
     let repo = get_repo()?;
     let commit_oid = git2::Oid::from_str(&oid).map_err(|e| e.to_string())?;
     let commit = repo.find_commit(commit_oid).map_err(|e| e.to_string())?;
-    
+
     let tree = if is_old {
         // Get parent tree for old version
         if let Ok(parent) = commit.parent(0) {
@@ -314,7 +581,7 @@ pub fn get_file_content(
         // Get current tree for new version
         commit.tree().map_err(|e| e.to_string())?
     };
-    
+
     // Distinguish "missing file" from an existing-but-empty file.
     match tree.get_path(Path::new(&file_path)) {
         Ok(entry) => {
@@ -332,13 +599,11 @@ pub fn get_file_content(
                 is_binary,
             })
         }
-        Err(_) => {
-            Ok(FileContentResponse {
-                content: String::new(),
-                exists: false,
-                is_binary: false,
-            })
-        }
+        Err(_) => Ok(FileContentResponse {
+            content: String::new(),
+            exists: false,
+            is_binary: false,
+        }),
     }
 }
 
@@ -359,7 +624,7 @@ fn build_tree_node(
     path: &str,
 ) -> Result<Vec<TreeNode>, String> {
     let mut nodes = Vec::new();
-    
+
     for entry in tree.iter() {
         let name = entry.name().unwrap_or("").to_string();
         let full_path = if path.is_empty() {
@@ -367,15 +632,16 @@ fn build_tree_node(
         } else {
             format!("{}/{}", path, name)
         };
-        
+
         match entry.kind() {
             Some(git2::ObjectType::Tree) => {
-                let subtree = entry.to_object(repo)
+                let subtree = entry
+                    .to_object(repo)
                     .and_then(|obj| obj.peel_to_tree())
                     .map_err(|e| e.to_string())?;
-                
+
                 let children = build_tree_node(repo, &subtree, &full_path)?;
-                
+
                 nodes.push(TreeNode {
                     name,
                     path: full_path,
@@ -385,10 +651,11 @@ fn build_tree_node(
                 });
             }
             Some(git2::ObjectType::Blob) => {
-                let blob = entry.to_object(repo)
+                let blob = entry
+                    .to_object(repo)
                     .and_then(|obj| obj.peel_to_blob())
                     .map_err(|e| e.to_string())?;
-                
+
                 nodes.push(TreeNode {
                     name,
                     path: full_path,
@@ -400,16 +667,14 @@ fn build_tree_node(
             _ => {}
         }
     }
-    
+
     // Sort: directories first, then files, both alphabetically
-    nodes.sort_by(|a, b| {
-        match (a.node_type.as_str(), b.node_type.as_str()) {
-            ("tree", "blob") => std::cmp::Ordering::Less,
-            ("blob", "tree") => std::cmp::Ordering::Greater,
-            _ => a.name.cmp(&b.name),
-        }
+    nodes.sort_by(|a, b| match (a.node_type.as_str(), b.node_type.as_str()) {
+        ("tree", "blob") => std::cmp::Ordering::Less,
+        ("blob", "tree") => std::cmp::Ordering::Greater,
+        _ => a.name.cmp(&b.name),
     });
-    
+
     Ok(nodes)
 }
 
@@ -419,7 +684,7 @@ pub fn get_commit_tree(oid: String) -> Result<Vec<TreeNode>, String> {
     let commit_oid = git2::Oid::from_str(&oid).map_err(|e| e.to_string())?;
     let commit = repo.find_commit(commit_oid).map_err(|e| e.to_string())?;
     let tree = commit.tree().map_err(|e| e.to_string())?;
-    
+
     build_tree_node(&repo, &tree, "")
 }
 
@@ -451,7 +716,8 @@ pub fn checkout_branch(name: String) -> Result<(), String> {
 #[tauri::command]
 pub fn create_branch(name: String, from: Option<String>) -> Result<(), String> {
     let repo = get_repo()?;
-    crate::git_engine::operations::create_branch(&repo, &name, from.as_deref()).map_err(|e| e.to_string())?;
+    crate::git_engine::operations::create_branch(&repo, &name, from.as_deref())
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -539,6 +805,23 @@ pub fn get_working_tree_diff(
         ignore_whitespace,
     )
     .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_working_tree_diff_view(
+    path: Option<String>,
+    staged: bool,
+    context_lines: Option<usize>,
+    ignore_whitespace: Option<bool>,
+) -> Result<DiffViewResponse, String> {
+    let repo = get_repo()?;
+    get_working_tree_diff_view_for_repo(
+        &repo,
+        path.as_deref(),
+        staged,
+        context_lines,
+        ignore_whitespace,
+    )
 }
 
 #[tauri::command]
@@ -695,6 +978,48 @@ pub struct FileContentResponse {
     pub is_binary: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffViewResponse {
+    pub files: Vec<DiffFileView>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffFileView {
+    pub path: String,
+    pub old_path: Option<String>,
+    pub new_path: Option<String>,
+    pub status: String,
+    pub is_binary: bool,
+    pub hunks: Vec<DiffHunkView>,
+    pub meta: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiffHunkView {
+    pub header: String,
+    pub lines: Vec<DiffLineView>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DiffLineKind {
+    Context,
+    Add,
+    Remove,
+    NoNewline,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffLineView {
+    pub kind: DiffLineKind,
+    pub old_line: Option<u32>,
+    pub new_line: Option<u32>,
+    pub text: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProviderRepository {
     pub id: String,
@@ -832,7 +1157,11 @@ fn fetch_github_repositories(
 }
 
 fn github_api_bases_for_host(host: &str) -> Vec<String> {
-    let normalized = host.trim().trim_start_matches("https://").trim_start_matches("http://").trim_end_matches('/');
+    let normalized = host
+        .trim()
+        .trim_start_matches("https://")
+        .trim_start_matches("http://")
+        .trim_end_matches('/');
 
     if normalized.eq_ignore_ascii_case("github.com") {
         return vec!["https://api.github.com".to_string()];
@@ -951,6 +1280,207 @@ mod tests {
                     .expect("initial commit");
             }
         }
+    }
+
+    fn head_oid(repo: &Repository) -> String {
+        repo.head()
+            .expect("head")
+            .target()
+            .expect("head target")
+            .to_string()
+    }
+
+    #[test]
+    fn commit_diff_view_builds_expected_line_kinds() {
+        let repo = init_repo("diff-view-kinds");
+        let workdir = repo.workdir().expect("workdir");
+
+        fs::write(
+            workdir.join("sample.txt"),
+            "line one\nline two\nline three\n",
+        )
+        .expect("write initial");
+        commit_all(&repo, "initial");
+
+        fs::write(
+            workdir.join("sample.txt"),
+            "line one\nline two changed\nline three",
+        )
+        .expect("write updated");
+        commit_all(&repo, "update");
+
+        let response = get_commit_diff_view_for_repo(
+            &repo,
+            &head_oid(&repo),
+            Some(3),
+            Some(false),
+            Some("sample.txt"),
+        )
+        .expect("commit diff view");
+
+        assert_eq!(response.files.len(), 1);
+        let lines: Vec<&DiffLineView> = response.files[0]
+            .hunks
+            .iter()
+            .flat_map(|hunk| hunk.lines.iter())
+            .collect();
+
+        assert!(lines.iter().any(|line| line.kind == DiffLineKind::Add));
+        assert!(lines.iter().any(|line| line.kind == DiffLineKind::Remove));
+        assert!(lines.iter().any(|line| line.kind == DiffLineKind::Context));
+        assert!(
+            lines
+                .iter()
+                .any(|line| line.kind == DiffLineKind::NoNewline),
+            "expected \\ No newline marker to be surfaced as no-newline"
+        );
+    }
+
+    #[test]
+    fn commit_diff_view_keeps_hunk_lines_with_diff_like_prefixes() {
+        let repo = init_repo("diff-view-prefixes");
+        let workdir = repo.workdir().expect("workdir");
+
+        fs::write(
+            workdir.join("code.txt"),
+            "keep this\n--- old sentinel\nindex same sentinel\ndiff --git old sentinel\n",
+        )
+        .expect("write initial");
+        commit_all(&repo, "initial");
+
+        fs::write(
+            workdir.join("code.txt"),
+            "keep this\n+++ new sentinel\nindex same sentinel\ndiff --git new sentinel\n",
+        )
+        .expect("write updated");
+        commit_all(&repo, "update");
+
+        let response = get_commit_diff_view_for_repo(
+            &repo,
+            &head_oid(&repo),
+            Some(3),
+            Some(false),
+            Some("code.txt"),
+        )
+        .expect("commit diff view");
+
+        let lines: Vec<&DiffLineView> = response.files[0]
+            .hunks
+            .iter()
+            .flat_map(|hunk| hunk.lines.iter())
+            .collect();
+
+        let removed_header_like = lines
+            .iter()
+            .find(|line| line.text.contains("--- old sentinel"))
+            .expect("removed line with --- prefix");
+        assert_eq!(removed_header_like.kind, DiffLineKind::Remove);
+
+        let added_header_like = lines
+            .iter()
+            .find(|line| line.text.contains("+++ new sentinel"))
+            .expect("added line with +++ prefix");
+        assert_eq!(added_header_like.kind, DiffLineKind::Add);
+
+        let context_header_like = lines
+            .iter()
+            .find(|line| line.text.contains("index same sentinel"))
+            .expect("context line with index prefix");
+        assert_eq!(context_header_like.kind, DiffLineKind::Context);
+
+        let removed_diff_like = lines
+            .iter()
+            .find(|line| line.text.contains("diff --git old sentinel"))
+            .expect("removed line with diff --git prefix");
+        assert_eq!(removed_diff_like.kind, DiffLineKind::Remove);
+
+        let added_diff_like = lines
+            .iter()
+            .find(|line| line.text.contains("diff --git new sentinel"))
+            .expect("added line with diff --git prefix");
+        assert_eq!(added_diff_like.kind, DiffLineKind::Add);
+    }
+
+    #[test]
+    fn commit_diff_view_path_filter_handles_nested_special_paths() {
+        let repo = init_repo("diff-view-path-filter");
+        let workdir = repo.workdir().expect("workdir");
+
+        fs::create_dir_all(workdir.join("src/nested")).expect("create dirs");
+        let target_path = "src/nested/special file 'one'.ts";
+        fs::write(workdir.join(target_path), "const one = 1;\n").expect("write target");
+        fs::write(workdir.join("src/other.ts"), "export const other = 1;\n").expect("write other");
+        commit_all(&repo, "initial");
+
+        fs::write(workdir.join(target_path), "const one = 2;\n").expect("update target");
+        fs::write(workdir.join("src/other.ts"), "export const other = 2;\n").expect("update other");
+        commit_all(&repo, "update");
+
+        let response = get_commit_diff_view_for_repo(
+            &repo,
+            &head_oid(&repo),
+            Some(3),
+            Some(false),
+            Some(target_path),
+        )
+        .expect("commit diff view");
+
+        assert_eq!(response.files.len(), 1);
+        assert_eq!(response.files[0].path, target_path);
+    }
+
+    #[test]
+    fn commit_diff_view_respects_context_lines() {
+        let repo = init_repo("diff-view-context-lines");
+        let workdir = repo.workdir().expect("workdir");
+
+        fs::write(
+            workdir.join("context.txt"),
+            "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\n",
+        )
+        .expect("write initial");
+        commit_all(&repo, "initial");
+
+        fs::write(
+            workdir.join("context.txt"),
+            "line 1\nline 2\nline 3\nline FOUR\nline 5\nline 6\nline 7\n",
+        )
+        .expect("write updated");
+        commit_all(&repo, "update");
+
+        let base_args = (&repo, head_oid(&repo), Some(false), Some("context.txt"));
+
+        let context_zero = get_commit_diff_view_for_repo(
+            base_args.0,
+            &base_args.1,
+            Some(0),
+            base_args.2,
+            base_args.3,
+        )
+        .expect("context 0");
+        let context_three = get_commit_diff_view_for_repo(
+            base_args.0,
+            &base_args.1,
+            Some(3),
+            base_args.2,
+            base_args.3,
+        )
+        .expect("context 3");
+
+        let count_context = |response: &DiffViewResponse| {
+            response.files[0]
+                .hunks
+                .iter()
+                .flat_map(|hunk| hunk.lines.iter())
+                .filter(|line| line.kind == DiffLineKind::Context)
+                .count()
+        };
+
+        let context_zero_count = count_context(&context_zero);
+        let context_three_count = count_context(&context_three);
+
+        assert_eq!(context_zero_count, 0);
+        assert!(context_three_count > context_zero_count);
     }
 
     #[test]

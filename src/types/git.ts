@@ -90,6 +90,34 @@ export interface DiffLine {
   origin: " " | "+" | "-" | "\\";
 }
 
+export type DiffLineViewKind = "context" | "add" | "remove" | "no-newline";
+
+export interface DiffLineView {
+  kind: DiffLineViewKind;
+  oldLine: number | null;
+  newLine: number | null;
+  text: string;
+}
+
+export interface DiffHunkView {
+  header: string;
+  lines: DiffLineView[];
+}
+
+export interface DiffFileView {
+  path: string;
+  oldPath: string | null;
+  newPath: string | null;
+  status: string;
+  isBinary: boolean;
+  hunks: DiffHunkView[];
+  meta: string[];
+}
+
+export interface DiffViewResponse {
+  files: DiffFileView[];
+}
+
 export type DiffLineKind =
   | "diff-add"
   | "diff-remove"
@@ -121,4 +149,3 @@ export interface CommitGraph {
   nodes: CommitNode[];
   edges: GraphEdge[];
 }
-

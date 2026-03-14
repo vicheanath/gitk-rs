@@ -121,8 +121,52 @@ export function useDiffViewerViewModel({
           ? files.filter((file) => file.path === selectedFile)
           : files;
 
+        if (selectedFile && targetFiles.length === 1) {
+          const selectedTargetFile = targetFiles[0];
+          const diffTextForSelectedFile = await invoke<string>("get_diff", {
+            oid: commitId,
+            contextLines,
+            ignoreWhitespace,
+            filePath: selectedFile,
+          });
+
+          if (cancelled) {
+            return;
+          }
+
+          if (!diffTextForSelectedFile || diffTextForSelectedFile.trim().length === 0) {
+            setContent(
+              getNoDiffMessageForSideView(
+                selectedTargetFile.status,
+                viewMode,
+                diffTextForSelectedFile
+              )
+            );
+            return;
+          }
+
+          const sideView = buildSideContentFromDiff(diffTextForSelectedFile, viewMode);
+          if (sideView.hasRenderableLines) {
+            setContent(sideView.content);
+            if (isOld) {
+              setOldChangedLines(sideView.changedDisplayLines);
+            } else {
+              setNewChangedLines(sideView.changedDisplayLines);
+            }
+            return;
+          }
+
+          setContent(
+            getNoDiffMessageForSideView(
+              selectedTargetFile.status,
+              viewMode,
+              diffTextForSelectedFile
+            )
+          );
+          return;
+        }
+
         const fileContents: string[] = [];
-        let selectedFileContentLoaded = false;
 
         for (const file of targetFiles) {
           try {
@@ -152,8 +196,6 @@ export function useDiffViewerViewModel({
 
             if (targetFiles.length === 1) {
               fileContents.push(contentToRender);
-              selectedFileContentLoaded =
-                fileResponse.exists && !fileResponse.is_binary;
             } else {
               fileContents.push(`\n=== ${file.path} ===\n`);
               fileContents.push(contentToRender);
@@ -181,40 +223,6 @@ export function useDiffViewerViewModel({
                 fileContents.push(`(Error loading file: ${String(error)})`);
               }
             }
-          }
-        }
-
-        // For selected-file old/new views, derive changed line numbers to apply diff colors in code view.
-        if (selectedFile && targetFiles.length === 1 && selectedFileContentLoaded) {
-          const diffTextForSelectedFile = await invoke<string>("get_diff", {
-            oid: commitId,
-            contextLines,
-            ignoreWhitespace,
-            filePath: selectedFile,
-          });
-
-          if (!cancelled) {
-            let lineInfo = getChangedLineNumbersFromDiff(diffTextForSelectedFile);
-
-            if (
-              !diffTextForSelectedFile ||
-              diffTextForSelectedFile.trim().length === 0
-            ) {
-              const fullDiffText = await invoke<string>("get_diff", {
-                oid: commitId,
-                contextLines,
-                ignoreWhitespace,
-              });
-
-              if (cancelled) {
-                return;
-              }
-
-              lineInfo = getChangedLineNumbersForFile(fullDiffText, selectedFile);
-            }
-
-            setOldChangedLines(lineInfo.oldChangedLines);
-            setNewChangedLines(lineInfo.newChangedLines);
           }
         }
 
@@ -324,7 +332,7 @@ function buildDiffLineInfo(
       continue;
     }
 
-    if (line.startsWith("index ")) {
+    if (!inHunk && line.startsWith("index ")) {
       info.set(lineNo, {
         kind: "diff-index",
         gutterLabel: "",
@@ -333,7 +341,7 @@ function buildDiffLineInfo(
       continue;
     }
 
-    if (line.startsWith("--- ")) {
+    if (!inHunk && isOldFileHeaderLine(line)) {
       info.set(lineNo, {
         kind: "diff-file-old",
         gutterLabel: "",
@@ -342,7 +350,7 @@ function buildDiffLineInfo(
       continue;
     }
 
-    if (line.startsWith("+++ ")) {
+    if (!inHunk && isNewFileHeaderLine(line)) {
       info.set(lineNo, {
         kind: "diff-file-new",
         gutterLabel: "",
@@ -351,17 +359,16 @@ function buildDiffLineInfo(
       continue;
     }
 
-    if (
-      line.startsWith("new file mode") ||
-      line.startsWith("deleted file mode") ||
-      line.startsWith("similarity index") ||
-      line.startsWith("rename from") ||
-      line.startsWith("rename to") ||
-      line.startsWith("old mode") ||
-      line.startsWith("new mode") ||
-      line.startsWith("Binary files ") ||
-      line.startsWith("\\ No newline at end of file")
-    ) {
+    if (line.startsWith("\\ No newline at end of file")) {
+      info.set(lineNo, {
+        kind: "diff-meta",
+        gutterLabel: "",
+        filePath: currentFilePath,
+      });
+      continue;
+    }
+
+    if (!inHunk && isDiffMetadataLine(line)) {
       info.set(lineNo, {
         kind: "diff-meta",
         gutterLabel: "",
@@ -400,7 +407,7 @@ function buildDiffLineInfo(
       continue;
     }
 
-    if (line.startsWith("+") && !line.startsWith("+++")) {
+    if (line.startsWith("+")) {
       info.set(lineNo, {
         kind: "diff-add",
         gutterLabel: formatDiffGutterLabel(undefined, newLine),
@@ -410,7 +417,7 @@ function buildDiffLineInfo(
       continue;
     }
 
-    if (line.startsWith("-") && !line.startsWith("---")) {
+    if (line.startsWith("-")) {
       info.set(lineNo, {
         kind: "diff-remove",
         gutterLabel: formatDiffGutterLabel(oldLine, undefined),
@@ -441,11 +448,151 @@ function buildDiffLineInfo(
   return info;
 }
 
+function isOldFileHeaderLine(line: string): boolean {
+  return /^--- (?:a\/|\/dev\/null|"a\/|"\/dev\/null)/.test(line);
+}
+
+function isNewFileHeaderLine(line: string): boolean {
+  return /^\+\+\+ (?:b\/|\/dev\/null|"b\/|"\/dev\/null)/.test(line);
+}
+
+function isDiffMetadataLine(line: string): boolean {
+  return (
+    line.startsWith("new file mode") ||
+    line.startsWith("deleted file mode") ||
+    line.startsWith("similarity index") ||
+    line.startsWith("rename from") ||
+    line.startsWith("rename to") ||
+    line.startsWith("old mode") ||
+    line.startsWith("new mode") ||
+    line.startsWith("Binary files ") ||
+    line.startsWith("GIT binary patch")
+  );
+}
+
+function isDiffFileBoundaryLine(line: string): boolean {
+  return (
+    line.startsWith("diff --git ") ||
+    line.startsWith("index ") ||
+    isOldFileHeaderLine(line) ||
+    isNewFileHeaderLine(line)
+  );
+}
+
 function formatDiffGutterLabel(oldLine?: number, newLine?: number): string {
   const oldLabel = oldLine === undefined ? "" : String(oldLine);
   const newLabel = newLine === undefined ? "" : String(newLine);
 
   return `${oldLabel.padStart(4, " ")} ${newLabel.padStart(4, " ")}`;
+}
+
+function buildSideContentFromDiff(
+  diffText: string,
+  viewMode: "old" | "new"
+): {
+  content: string;
+  changedDisplayLines: number[];
+  hasRenderableLines: boolean;
+} {
+  const lines = diffText.split("\n");
+  const renderedLines: string[] = [];
+  const changedDisplayLines: number[] = [];
+
+  let oldLine = 0;
+  let newLine = 0;
+  let inHunk = false;
+  let seenHunk = false;
+
+  const pushRenderedLine = (line: string, changed: boolean) => {
+    renderedLines.push(line);
+    if (changed) {
+      changedDisplayLines.push(renderedLines.length);
+    }
+  };
+
+  for (const line of lines) {
+    if (!inHunk && (isDiffFileBoundaryLine(line) || isDiffMetadataLine(line))) {
+      inHunk = false;
+      continue;
+    }
+
+    if (line.startsWith("@@")) {
+      const match = line.match(/^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/);
+      if (!match) {
+        inHunk = false;
+        continue;
+      }
+
+      if (seenHunk && renderedLines.length > 0) {
+        pushRenderedLine("", false);
+      }
+
+      oldLine = Number.parseInt(match[1], 10);
+      newLine = Number.parseInt(match[3], 10);
+      inHunk = true;
+      seenHunk = true;
+      continue;
+    }
+
+    if (!inHunk) {
+      continue;
+    }
+
+    if (line.startsWith("+")) {
+      if (viewMode === "new") {
+        pushRenderedLine(line.slice(1), true);
+      }
+      newLine += 1;
+      continue;
+    }
+
+    if (line.startsWith("-")) {
+      if (viewMode === "old") {
+        pushRenderedLine(line.slice(1), true);
+      }
+      oldLine += 1;
+      continue;
+    }
+
+    if (line.startsWith("\\")) {
+      continue;
+    }
+
+    if (line.startsWith(" ")) {
+      pushRenderedLine(line.slice(1), false);
+      oldLine += 1;
+      newLine += 1;
+    }
+  }
+
+  return {
+    content: renderedLines.join("\n"),
+    changedDisplayLines,
+    hasRenderableLines: renderedLines.length > 0,
+  };
+}
+
+function getNoDiffMessageForSideView(
+  fileStatus: ChangedFile["status"],
+  viewMode: "old" | "new",
+  diffText: string
+): string {
+  if (viewMode === "old" && fileStatus === "added") {
+    return "(File does not exist in old version)";
+  }
+
+  if (viewMode === "new" && fileStatus === "deleted") {
+    return "(File was deleted)";
+  }
+
+  if (
+    diffText.includes("Binary files ") ||
+    diffText.includes("GIT binary patch")
+  ) {
+    return "(Binary file content is not displayable in patch view)";
+  }
+
+  return "No changed lines to display for this file with current context";
 }
 
 function splitDiffSections(diffText: string): string[] {
@@ -498,78 +645,4 @@ function sectionMatchesFile(section: string, filePath: string): boolean {
   ];
 
   return patterns.some((pattern) => pattern.test(section));
-}
-
-function getChangedLineNumbersForFile(diffText: string, filePath: string): {
-  oldChangedLines: number[];
-  newChangedLines: number[];
-} {
-  const sections = splitDiffSections(diffText);
-  const targetSection = sections.find((section) => sectionMatchesFile(section, filePath));
-
-  if (!targetSection) {
-    return { oldChangedLines: [], newChangedLines: [] };
-  }
-
-  return getChangedLineNumbersFromDiff(targetSection);
-}
-
-function getChangedLineNumbersFromDiff(diffText: string): {
-  oldChangedLines: number[];
-  newChangedLines: number[];
-} {
-  if (!diffText || diffText.trim().length === 0) {
-    return { oldChangedLines: [], newChangedLines: [] };
-  }
-
-  const oldChangedLines = new Set<number>();
-  const newChangedLines = new Set<number>();
-  const lines = diffText.split("\n");
-
-  let oldLine = 0;
-  let newLine = 0;
-  let inHunk = false;
-
-  for (const line of lines) {
-    if (line.startsWith("@@")) {
-      const match = line.match(/^@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/);
-      if (!match) {
-        inHunk = false;
-        continue;
-      }
-
-      oldLine = Number.parseInt(match[1], 10);
-      newLine = Number.parseInt(match[3], 10);
-      inHunk = true;
-      continue;
-    }
-
-    if (!inHunk || line.startsWith("diff --git")) {
-      continue;
-    }
-
-    if (line.startsWith("+") && !line.startsWith("+++")) {
-      newChangedLines.add(newLine);
-      newLine += 1;
-      continue;
-    }
-
-    if (line.startsWith("-") && !line.startsWith("---")) {
-      oldChangedLines.add(oldLine);
-      oldLine += 1;
-      continue;
-    }
-
-    if (line.startsWith("\\")) {
-      continue;
-    }
-
-    oldLine += 1;
-    newLine += 1;
-  }
-
-  return {
-    oldChangedLines: [...oldChangedLines],
-    newChangedLines: [...newChangedLines],
-  };
 }

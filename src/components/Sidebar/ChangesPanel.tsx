@@ -13,9 +13,10 @@ import {
   RotateCcw,
   Waypoints,
 } from "lucide-react";
-import { WorkingTreeFile } from "../../types/git";
+import { DiffFileView, DiffViewResponse, WorkingTreeFile } from "../../types/git";
 import { useAppContext } from "../../context/AppContext";
 import { Button } from "../ui/button";
+import StructuredDiffTable from "../Diff/StructuredDiffTable";
 
 type ViewMode = "tree" | "list";
 type SectionKind = "staged" | "unstaged";
@@ -127,16 +128,6 @@ function statusTone(file: WorkingTreeFile, section: SectionKind): string {
   return "added";
 }
 
-function classifyDiffLine(line: string): string {
-  if (line.startsWith("diff --git")) return "text-[var(--accent-primary)]";
-  if (line.startsWith("index ")) return "text-[var(--text-muted)]";
-  if (line.startsWith("@@")) return "text-[var(--warning)]";
-  if (line.startsWith("---") || line.startsWith("+++")) return "text-[var(--text-secondary)]";
-  if (line.startsWith("+") && !line.startsWith("+++")) return "text-[var(--success)]";
-  if (line.startsWith("-") && !line.startsWith("---")) return "text-[var(--danger)]";
-  return "";
-}
-
 function statusToneClass(tone: string): string {
   switch (tone) {
     case "conflict":
@@ -167,7 +158,7 @@ export default function ChangesPanel() {
     unstaged: true,
   });
   const [selectedChange, setSelectedChange] = useState<SelectedChange | null>(null);
-  const [diffText, setDiffText] = useState("");
+  const [diffFile, setDiffFile] = useState<DiffFileView | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
   const [diffError, setDiffError] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -263,7 +254,7 @@ export default function ChangesPanel() {
 
   useEffect(() => {
     if (!selectedChange) {
-      setDiffText("");
+      setDiffFile(null);
       setDiffError(null);
       return;
     }
@@ -274,7 +265,7 @@ export default function ChangesPanel() {
       setDiffLoading(true);
       setDiffError(null);
       try {
-        const result = await invoke<string>("get_working_tree_diff", {
+        const result = await invoke<DiffViewResponse>("get_working_tree_diff_view", {
           path: selectedChange.path,
           staged: selectedChange.section === "staged",
           contextLines: 3,
@@ -282,12 +273,20 @@ export default function ChangesPanel() {
         });
 
         if (!cancelled) {
-          setDiffText(result);
+          const selectedDiffFile: DiffFileView | null =
+            result.files.find(
+              (file) =>
+                file.path === selectedChange.path ||
+                file.oldPath === selectedChange.path ||
+                file.newPath === selectedChange.path
+            ) ??
+            (result.files.length > 0 ? result.files[0] : null);
+          setDiffFile(selectedDiffFile);
         }
       } catch (err) {
         if (!cancelled) {
           setDiffError(String(err));
-          setDiffText("");
+          setDiffFile(null);
         }
       } finally {
         if (!cancelled) {
@@ -658,23 +657,12 @@ export default function ChangesPanel() {
               {!diffLoading && !diffError && !selectedChange ? (
                 <p className="text-[var(--text-muted)]">Select a file to preview changes</p>
               ) : null}
-              {!diffLoading && !diffError && selectedChange && diffText.trim().length === 0 ? (
-                <p className="text-[var(--text-muted)]">No diff content available</p>
-              ) : null}
-              {!diffLoading && !diffError && diffText.trim().length > 0 ? (
-                <div>
-                  {diffText.split("\n").map((line, index) => {
-                    const lineClass = classifyDiffLine(line);
-                    return (
-                      <div
-                        key={`${selectedChange?.section ?? "none"}:${selectedChange?.path ?? "none"}:${index}`}
-                        className={`whitespace-pre-wrap wrap-break-word ${lineClass}`.trim()}
-                      >
-                        {line}
-                      </div>
-                    );
-                  })}
-                </div>
+              {!diffLoading && !diffError && selectedChange ? (
+                <StructuredDiffTable
+                  files={diffFile ? [diffFile] : []}
+                  mode="unified"
+                  emptyMessage="No changed lines for current context."
+                />
               ) : null}
             </div>
           </section>

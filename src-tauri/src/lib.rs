@@ -8,9 +8,10 @@ mod auth;
 mod commands;
 mod git_engine;
 
-fn build_native_menu<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<tauri::menu::Menu<R>> {
-    let about = MenuItemBuilder::with_id("open_about", "About GitK-RS")
-        .build(manager)?;
+fn build_native_menu<R: Runtime, M: Manager<R>>(
+    manager: &M,
+) -> tauri::Result<tauri::menu::Menu<R>> {
+    let about = MenuItemBuilder::with_id("open_about", "About GitK-RS").build(manager)?;
     let open_repository = MenuItemBuilder::with_id("open_repository", "Open Repository...")
         .accelerator("CmdOrCtrl+O")
         .build(manager)?;
@@ -29,8 +30,8 @@ fn build_native_menu<R: Runtime, M: Manager<R>>(manager: &M) -> tauri::Result<ta
     let open_settings = MenuItemBuilder::with_id("open_settings", "Settings")
         .accelerator("CmdOrCtrl+,")
         .build(manager)?;
-    let setup_cli = MenuItemBuilder::with_id("setup_cli", "Setup 'gitr' CLI Command...")
-        .build(manager)?;
+    let setup_cli =
+        MenuItemBuilder::with_id("setup_cli", "Setup 'gitr' CLI Command...").build(manager)?;
     let keyboard_shortcuts = MenuItemBuilder::with_id("show_shortcuts", "Keyboard Shortcuts")
         .accelerator("CmdOrCtrl+/")
         .build(manager)?;
@@ -93,6 +94,7 @@ pub fn run() {
             commands::get_commit_details,
             commands::get_commit_branches,
             commands::get_diff,
+            commands::get_commit_diff_view,
             commands::get_file_content,
             commands::get_commit_tree,
             commands::checkout_branch,
@@ -107,6 +109,7 @@ pub fn run() {
             commands::discard_all,
             commands::commit_staged,
             commands::get_working_tree_diff,
+            commands::get_working_tree_diff_view,
             commands::search_commits,
             commands::list_git_auth_connections,
             commands::upsert_git_auth_connection,
@@ -149,4 +152,3 @@ pub fn run() {
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-

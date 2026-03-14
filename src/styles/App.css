@@ -2591,13 +2591,17 @@ body {
 }
 
 .diff-simple-line.diff-add {
-  background-color: rgba(34, 134, 58, 0.18);
-  color: #9be9a8;
+  background-color: color-mix(in srgb, var(--diff-add-bg) 84%, transparent);
+  color: var(--diff-add-text);
+  box-shadow: inset 4px 0 0 var(--diff-add-border);
+  font-weight: 600;
 }
 
 .diff-simple-line.diff-remove {
-  background-color: rgba(255, 85, 85, 0.18);
-  color: #ffb3b3;
+  background-color: color-mix(in srgb, var(--diff-remove-bg) 84%, transparent);
+  color: var(--diff-remove-text);
+  box-shadow: inset 4px 0 0 var(--diff-remove-border);
+  font-weight: 600;
 }
 
 /* Error states */
@@ -3309,4 +3313,3 @@ body {
 [data-font-size="small"]  { --editor-font-size: 11px; }
 [data-font-size="medium"] { --editor-font-size: 13px; }
 [data-font-size="large"]  { --editor-font-size: 15px; }
-

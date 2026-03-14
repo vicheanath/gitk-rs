@@ -55,12 +55,19 @@ export default function DiffViewer({
   );
 
   // Color only changed lines in unified patch text.
-  const getDiffLineClass = (lineNum: number, lineText: string): string => {
+  const getDiffLineClass = (
+    lineNum: number,
+    lineText: string,
+    lineKind?: string
+  ): string => {
     if (viewMode === "diff") {
-      if (lineText.startsWith("+") && !lineText.startsWith("+++")) {
+      if (lineKind === "diff-file-old" || lineKind === "diff-file-new") {
+        return "";
+      }
+      if (lineText.startsWith("+")) {
         return "diff-add";
       }
-      if (lineText.startsWith("-") && !lineText.startsWith("---")) {
+      if (lineText.startsWith("-")) {
         return "diff-remove";
       }
       return "";
@@ -144,8 +151,8 @@ export default function DiffViewer({
     const lines = content.split("\n");
     return lines.map((line, idx) => {
       const lineNum = idx + 1;
-      const lineClass = getDiffLineClass(lineNum, line);
       const lineInfo = diffLineInfo.get(lineNum);
+      const lineClass = getDiffLineClass(lineNum, line, lineInfo?.kind);
       const lineKindClass = lineInfo?.kind ? `line-kind-${lineInfo.kind}` : "";
 
       if (!lineClass) {
