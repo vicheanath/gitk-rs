@@ -8,8 +8,7 @@ pub struct SqliteCache {
 }
 
 fn cache_db_path() -> PathBuf {
-    let base = dirs::data_dir()
-        .unwrap_or_else(|| std::env::temp_dir());
+    let base = dirs::data_dir().unwrap_or_else(|| std::env::temp_dir());
     base.join("gitk-rs").join("cache.db")
 }
 
@@ -45,13 +44,11 @@ impl SqliteCache {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create cache directory: {e}"))?;
         }
-        let conn = Connection::open(&path)
-            .map_err(|e| format!("Failed to open cache DB: {e}"))?;
+        let conn = Connection::open(&path).map_err(|e| format!("Failed to open cache DB: {e}"))?;
         // Enable WAL mode for better concurrent read performance
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;")
             .map_err(|e| format!("Failed to set WAL mode: {e}"))?;
-        init_schema(&conn)
-            .map_err(|e| format!("Failed to init cache schema: {e}"))?;
+        init_schema(&conn).map_err(|e| format!("Failed to init cache schema: {e}"))?;
         Ok(Self {
             conn: Mutex::new(conn),
         })

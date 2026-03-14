@@ -68,7 +68,8 @@ fn now_epoch_seconds() -> i64 {
 }
 
 fn auth_store_path() -> anyhow::Result<PathBuf> {
-    let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not resolve home directory"))?;
+    let home =
+        dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not resolve home directory"))?;
     let dir = home.join(".gitk-rs");
     if !dir.exists() {
         fs::create_dir_all(&dir)?;
@@ -104,11 +105,22 @@ fn normalize_identifier(value: &str) -> String {
         .trim()
         .to_lowercase()
         .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.' { ch } else { '-' })
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.' {
+                ch
+            } else {
+                '-'
+            }
+        })
         .collect()
 }
 
-fn connection_id(provider: &GitProvider, host: &str, username: Option<&str>, display_name: &str) -> String {
+fn connection_id(
+    provider: &GitProvider,
+    host: &str,
+    username: Option<&str>,
+    display_name: &str,
+) -> String {
     let provider_part = match provider {
         GitProvider::Github => "github",
         GitProvider::Gitlab => "gitlab",
@@ -166,7 +178,11 @@ pub fn upsert_connection(input: AuthConnectionInput) -> anyhow::Result<AuthConne
     let keyring_entry = keyring::Entry::new(KEYRING_SERVICE, &id)?;
     keyring_entry.set_password(input.token.trim())?;
 
-    if let Some(existing) = store.connections.iter_mut().find(|current| current.id == id) {
+    if let Some(existing) = store
+        .connections
+        .iter_mut()
+        .find(|current| current.id == id)
+    {
         existing.provider = connection.provider.clone();
         existing.host = connection.host.clone();
         existing.username = connection.username.clone();

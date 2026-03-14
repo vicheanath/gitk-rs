@@ -38,4 +38,3 @@ mod tests {
         assert_eq!(cloned.active_branch, state.active_branch);
     }
 }
-

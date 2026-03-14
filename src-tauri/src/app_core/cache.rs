@@ -92,4 +92,3 @@ mod tests {
         assert!(cache.get(&PathBuf::from("/tmp/repo-b")).is_none());
     }
 }
-

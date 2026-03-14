@@ -1,7 +1,7 @@
 use crate::app_core::{AppState, SqliteCache};
 use crate::auth::{self, AuthConnection, AuthConnectionInput};
 use crate::git_engine::operations::{open_repo, BranchInfo, TagInfo, WorkingTreeFile};
-use crate::git_engine::{build_commit_graph, CommitNode};
+use crate::git_engine::{build_commit_graph, load_commit_graph_page, CommitNode};
 use git2::Repository;
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
@@ -365,6 +365,32 @@ pub fn get_commit_graph(max_commits: Option<usize>) -> Result<CommitGraphRespons
     }
 
     Ok(response)
+}
+
+#[tauri::command]
+pub fn get_commit_graph_page(
+    skip: Option<usize>,
+    max_commits: Option<usize>,
+) -> Result<CommitGraphPageResponse, String> {
+    let repo = get_repo()?;
+    let page_skip = skip.unwrap_or(0);
+    let limit = max_commits.unwrap_or(1000);
+
+    let head_oid = repo
+        .head()
+        .ok()
+        .and_then(|h| h.target())
+        .map(|oid| oid.to_string())
+        .unwrap_or_default();
+
+    let page = load_commit_graph_page(&repo, page_skip, limit).map_err(|e| e.to_string())?;
+
+    Ok(CommitGraphPageResponse {
+        nodes: page.nodes,
+        has_more: page.has_more,
+        next_skip: page.next_skip,
+        head_oid,
+    })
 }
 
 #[tauri::command]
@@ -947,6 +973,14 @@ pub fn clone_repository(
 pub struct CommitGraphResponse {
     pub nodes: Vec<CommitNode>,
     pub edges: Vec<GraphEdge>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommitGraphPageResponse {
+    pub nodes: Vec<CommitNode>,
+    pub has_more: bool,
+    pub next_skip: usize,
+    pub head_oid: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

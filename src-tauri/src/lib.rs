@@ -98,6 +98,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::open_repository,
             commands::get_commit_graph,
+            commands::get_commit_graph_page,
             commands::get_branches,
             commands::get_tags,
             commands::get_commit_details,

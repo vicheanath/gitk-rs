@@ -8,6 +8,13 @@ pub struct CommitGraph {
     pub graph: Graph<CommitNode, ()>,
 }
 
+#[derive(Debug, Clone)]
+pub struct CommitGraphPage {
+    pub nodes: Vec<CommitNode>,
+    pub has_more: bool,
+    pub next_skip: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ParsedGraphRow {
     hash: String,
@@ -60,7 +67,11 @@ fn parse_git_log_graph_output(output: &str) -> anyhow::Result<Vec<ParsedGraphRow
     Ok(rows)
 }
 
-fn run_git_log_graph(repo: &Repository, max_commits: usize) -> anyhow::Result<String> {
+fn run_git_log_graph_with_skip(
+    repo: &Repository,
+    skip: usize,
+    max_commits: usize,
+) -> anyhow::Result<String> {
     let repo_root = repo
         .workdir()
         .ok_or_else(|| anyhow::anyhow!("repository has no workdir"))?;
@@ -70,6 +81,7 @@ fn run_git_log_graph(repo: &Repository, max_commits: usize) -> anyhow::Result<St
         .arg("log")
         .arg("--graph")
         .arg("--no-color")
+        .arg(format!("--skip={skip}"))
         .arg("-n")
         .arg(max_commits.to_string())
         .arg("--pretty=format:%H")
@@ -88,6 +100,10 @@ fn run_git_log_graph(repo: &Repository, max_commits: usize) -> anyhow::Result<St
 
     String::from_utf8(output.stdout)
         .map_err(|err| anyhow::anyhow!("invalid UTF-8 from `git log --graph`: {err}"))
+}
+
+fn run_git_log_graph(repo: &Repository, max_commits: usize) -> anyhow::Result<String> {
+    run_git_log_graph_with_skip(repo, 0, max_commits)
 }
 
 fn resolve_head_oid(repo: &Repository) -> anyhow::Result<Oid> {
@@ -175,12 +191,7 @@ fn build_commit_graph_from_rows(
     let mut graph = Graph::<CommitNode, ()>::new();
     let mut node_map = HashMap::new();
 
-    for row in rows {
-        let oid = Oid::from_str(&row.hash)?;
-        let commit = repo.find_commit(oid)?;
-        let mut commit_node = CommitNode::from_commit(&commit);
-        commit_node.graph_row = Some(row.row);
-        commit_node.graph_col = Some(row.column);
+    for commit_node in collect_nodes_from_rows(repo, rows)? {
         let node_id = commit_node.id.clone();
         let node_idx = graph.add_node(commit_node);
         node_map.insert(node_id, node_idx);
@@ -188,6 +199,23 @@ fn build_commit_graph_from_rows(
 
     connect_parent_edges(&mut graph, &node_map);
     Ok(CommitGraph { graph })
+}
+
+fn collect_nodes_from_rows(
+    repo: &Repository,
+    rows: Vec<ParsedGraphRow>,
+) -> anyhow::Result<Vec<CommitNode>> {
+    let mut nodes = Vec::with_capacity(rows.len());
+    for row in rows {
+        let oid = Oid::from_str(&row.hash)?;
+        let commit = repo.find_commit(oid)?;
+        let mut commit_node = CommitNode::from_commit(&commit);
+        commit_node.graph_row = Some(row.row);
+        commit_node.graph_col = Some(row.column);
+        nodes.push(commit_node);
+    }
+
+    Ok(nodes)
 }
 
 fn build_commit_graph_with_runner<F>(
@@ -224,6 +252,60 @@ pub fn build_commit_graph(
     max_commits: Option<usize>,
 ) -> anyhow::Result<CommitGraph> {
     build_commit_graph_with_runner(repo, max_commits, &run_git_log_graph)
+}
+
+fn load_commit_graph_page_with_runner<F>(
+    repo: &Repository,
+    skip: usize,
+    max_commits: usize,
+    runner: &F,
+) -> anyhow::Result<CommitGraphPage>
+where
+    F: Fn(&Repository, usize, usize) -> anyhow::Result<String>,
+{
+    if max_commits == 0 {
+        return Ok(CommitGraphPage {
+            nodes: Vec::new(),
+            has_more: false,
+            next_skip: skip,
+        });
+    }
+
+    let output = runner(repo, skip, max_commits.saturating_add(1))?;
+    if output.trim().is_empty() {
+        return Ok(CommitGraphPage {
+            nodes: Vec::new(),
+            has_more: false,
+            next_skip: skip,
+        });
+    }
+
+    let mut rows = parse_git_log_graph_output(&output)?;
+    for row in &mut rows {
+        row.row = row.row.saturating_add(skip);
+    }
+
+    let has_more = rows.len() > max_commits;
+    if has_more {
+        rows.truncate(max_commits);
+    }
+
+    let nodes = collect_nodes_from_rows(repo, rows)?;
+    let next_skip = skip.saturating_add(nodes.len());
+
+    Ok(CommitGraphPage {
+        nodes,
+        has_more,
+        next_skip,
+    })
+}
+
+pub fn load_commit_graph_page(
+    repo: &Repository,
+    skip: usize,
+    max_commits: usize,
+) -> anyhow::Result<CommitGraphPage> {
+    load_commit_graph_page_with_runner(repo, skip, max_commits, &run_git_log_graph_with_skip)
 }
 
 #[cfg(test)]
@@ -533,5 +615,37 @@ mod tests {
         assert!(latest.graph_col.is_none());
         assert!(first.graph_row.is_none());
         assert!(first.graph_col.is_none());
+    }
+
+    #[test]
+    fn paged_graph_skip_zero_reports_has_more_and_next_skip() {
+        let repo = init_repo("paged-first");
+        let _c1 = commit_file(&repo, "a.txt", "one", "first");
+        let _c2 = commit_file(&repo, "a.txt", "two", "second");
+        let c3 = commit_file(&repo, "a.txt", "three", "third");
+
+        let page = load_commit_graph_page(&repo, 0, 2).expect("load first page");
+        assert_eq!(page.nodes.len(), 2);
+        assert!(page.has_more);
+        assert_eq!(page.next_skip, 2);
+        assert_eq!(page.nodes[0].id, c3.to_string());
+        assert_eq!(page.nodes[0].graph_row, Some(0));
+    }
+
+    #[test]
+    fn paged_graph_skip_progresses_rows_and_exhausts_history() {
+        let repo = init_repo("paged-next");
+        let c1 = commit_file(&repo, "a.txt", "one", "first");
+        let _c2 = commit_file(&repo, "a.txt", "two", "second");
+        let _c3 = commit_file(&repo, "a.txt", "three", "third");
+
+        let first = load_commit_graph_page(&repo, 0, 2).expect("first page");
+        let second = load_commit_graph_page(&repo, first.next_skip, 2).expect("second page");
+
+        assert_eq!(second.nodes.len(), 1);
+        assert!(!second.has_more);
+        assert_eq!(second.next_skip, 3);
+        assert_eq!(second.nodes[0].id, c1.to_string());
+        assert_eq!(second.nodes[0].graph_row, Some(2));
     }
 }

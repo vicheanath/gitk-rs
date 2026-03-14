@@ -1,5 +1,8 @@
 use crate::git_engine::commit::CommitNode;
-use git2::{build::CheckoutBuilder, BranchType, IndexAddOption, Repository, Signature, Status, StatusOptions};
+use git2::{
+    build::CheckoutBuilder, BranchType, IndexAddOption, Repository, Signature, Status,
+    StatusOptions,
+};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
@@ -17,9 +20,9 @@ pub fn get_branches(repo: &Repository) -> anyhow::Result<Vec<BranchInfo>> {
         let (branch, _branch_type) = branch_result?;
         let name = branch.name()?.unwrap_or("").to_string();
         let is_current = name == head_name;
-        
+
         let commit = branch.get().peel_to_commit()?;
-        
+
         branches.push(BranchInfo {
             name,
             is_current,
@@ -31,9 +34,9 @@ pub fn get_branches(repo: &Repository) -> anyhow::Result<Vec<BranchInfo>> {
     for branch_result in repo.branches(Some(BranchType::Remote))? {
         let (branch, _) = branch_result?;
         let name = branch.name()?.unwrap_or("").to_string();
-        
+
         let commit = branch.get().peel_to_commit()?;
-        
+
         branches.push(BranchInfo {
             name,
             is_current: false,
@@ -47,11 +50,14 @@ pub fn get_branches(repo: &Repository) -> anyhow::Result<Vec<BranchInfo>> {
 
 pub fn get_tags(repo: &Repository) -> anyhow::Result<Vec<TagInfo>> {
     let mut tags = Vec::new();
-    
+
     repo.tag_foreach(|id, name| {
         let name_str = String::from_utf8_lossy(name);
-        let tag_name = name_str.strip_prefix("refs/tags/").unwrap_or(&name_str).to_string();
-        
+        let tag_name = name_str
+            .strip_prefix("refs/tags/")
+            .unwrap_or(&name_str)
+            .to_string();
+
         if let Ok(tag) = repo.find_tag(id) {
             let commit_id = tag.target_id().to_string();
             let message = tag.message().map(|s| s.to_string());
@@ -67,7 +73,7 @@ pub fn get_tags(repo: &Repository) -> anyhow::Result<Vec<TagInfo>> {
                 message: None,
             });
         }
-        
+
         true
     })?;
 
@@ -76,19 +82,23 @@ pub fn get_tags(repo: &Repository) -> anyhow::Result<Vec<TagInfo>> {
 
 pub fn checkout_branch(repo: &Repository, branch_name: &str) -> anyhow::Result<()> {
     let (object, reference) = repo.revparse_ext(branch_name)?;
-    
+
     repo.checkout_tree(&object, None)?;
-    
+
     if let Some(reference) = reference {
         repo.set_head(reference.name().unwrap())?;
     } else {
         repo.set_head_detached(object.id())?;
     }
-    
+
     Ok(())
 }
 
-pub fn create_branch(repo: &Repository, branch_name: &str, from: Option<&str>) -> anyhow::Result<()> {
+pub fn create_branch(
+    repo: &Repository,
+    branch_name: &str,
+    from: Option<&str>,
+) -> anyhow::Result<()> {
     let commit = if let Some(from_ref) = from {
         let (object, _) = repo.revparse_ext(from_ref)?;
         repo.find_commit(object.id())?
@@ -96,7 +106,7 @@ pub fn create_branch(repo: &Repository, branch_name: &str, from: Option<&str>) -
         let head = repo.head()?;
         head.peel_to_commit()?
     };
-    
+
     repo.branch(branch_name, &commit, false)?;
     Ok(())
 }
@@ -165,7 +175,8 @@ pub fn get_working_tree_status(repo: &Repository) -> anyhow::Result<Vec<WorkingT
             .head_to_index()
             .and_then(|delta| delta.new_file().path().or_else(|| delta.old_file().path()))
             .or_else(|| {
-                entry.index_to_workdir()
+                entry
+                    .index_to_workdir()
                     .and_then(|delta| delta.new_file().path().or_else(|| delta.old_file().path()))
             })
             .map(|path| path.to_string_lossy().to_string());
@@ -264,7 +275,7 @@ fn remove_workdir_path(repo: &Repository, path: &str) -> anyhow::Result<()> {
     let absolute = workdir.join(path);
 
     if !absolute.exists() {
-      return Ok(());
+        return Ok(());
     }
 
     if absolute.is_dir() {
@@ -281,13 +292,15 @@ pub fn discard_paths(repo: &Repository, paths: &[String]) -> anyhow::Result<()> 
         let repo_path = Path::new(path);
         let status = repo.status_file(repo_path).unwrap_or(Status::empty());
 
-        if status.contains(Status::WT_NEW) && !status.intersects(
-            Status::INDEX_NEW
-                | Status::INDEX_MODIFIED
-                | Status::INDEX_DELETED
-                | Status::INDEX_RENAMED
-                | Status::INDEX_TYPECHANGE,
-        ) {
+        if status.contains(Status::WT_NEW)
+            && !status.intersects(
+                Status::INDEX_NEW
+                    | Status::INDEX_MODIFIED
+                    | Status::INDEX_DELETED
+                    | Status::INDEX_RENAMED
+                    | Status::INDEX_TYPECHANGE,
+            )
+        {
             remove_workdir_path(repo, path)?;
             continue;
         }
@@ -342,9 +355,16 @@ pub fn commit_staged(repo: &Repository, message: &str) -> anyhow::Result<String>
     let commit_oid = match repo.head() {
         Ok(head) => {
             let parent = head.peel_to_commit()?;
-            repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[&parent])?
+            repo.commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                message,
+                &tree,
+                &[&parent],
+            )?
         }
-        Err(_) => repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[])?
+        Err(_) => repo.commit(Some("HEAD"), &signature, &signature, message, &tree, &[])?,
     };
 
     index.write()?;
@@ -394,13 +414,17 @@ pub fn get_working_tree_diff(
     Ok(diff_text)
 }
 
-pub fn search_commits(repo: &Repository, query: &str, max_results: usize) -> anyhow::Result<Vec<CommitNode>> {
+pub fn search_commits(
+    repo: &Repository,
+    query: &str,
+    max_results: usize,
+) -> anyhow::Result<Vec<CommitNode>> {
     let mut revwalk = repo.revwalk()?;
     revwalk.push_head()?;
-    
+
     let query_lower = query.to_lowercase();
     let mut results = Vec::new();
-    
+
     for oid in revwalk {
         if results.len() >= max_results {
             break;
@@ -408,48 +432,54 @@ pub fn search_commits(repo: &Repository, query: &str, max_results: usize) -> any
         let oid = oid?;
         let commit = repo.find_commit(oid)?;
         let message = commit.message().unwrap_or("").to_lowercase();
-        
+
         if message.contains(&query_lower) {
             results.push(CommitNode::from_commit(&commit));
         }
     }
-    
+
     Ok(results)
 }
 
 fn is_descendant_or_same(repo: &Repository, descendant: git2::Oid, ancestor: git2::Oid) -> bool {
-    descendant == ancestor || repo.graph_descendant_of(descendant, ancestor).unwrap_or(false)
+    descendant == ancestor
+        || repo
+            .graph_descendant_of(descendant, ancestor)
+            .unwrap_or(false)
 }
 
 /// Get all branches that contain the given commit
-pub fn get_branches_containing_commit(repo: &Repository, commit_id: &str) -> anyhow::Result<Vec<String>> {
+pub fn get_branches_containing_commit(
+    repo: &Repository,
+    commit_id: &str,
+) -> anyhow::Result<Vec<String>> {
     let commit_oid = git2::Oid::from_str(commit_id)?;
     let mut branches = Vec::new();
-    
+
     // Check local branches
     for branch_result in repo.branches(Some(BranchType::Local))? {
         let (branch, _) = branch_result?;
         let branch_name = branch.name()?.unwrap_or("").to_string();
-        
+
         if let Ok(branch_commit) = branch.get().peel_to_commit() {
             if is_descendant_or_same(repo, branch_commit.id(), commit_oid) {
                 branches.push(branch_name);
             }
         }
     }
-    
+
     // Check remote branches
     for branch_result in repo.branches(Some(BranchType::Remote))? {
         let (branch, _) = branch_result?;
         let branch_name = branch.name()?.unwrap_or("").to_string();
-        
+
         if let Ok(branch_commit) = branch.get().peel_to_commit() {
             if is_descendant_or_same(repo, branch_commit.id(), commit_oid) {
                 branches.push(branch_name);
             }
         }
     }
-    
+
     Ok(branches)
 }
 
@@ -507,13 +537,19 @@ pub fn get_related_tags_for_commit(
 
 /// Get tags that precede (come before) the given commit
 #[cfg(test)]
-pub fn get_tags_preceding_commit(repo: &Repository, commit_id: &str) -> anyhow::Result<Vec<String>> {
+pub fn get_tags_preceding_commit(
+    repo: &Repository,
+    commit_id: &str,
+) -> anyhow::Result<Vec<String>> {
     Ok(get_related_tags_for_commit(repo, commit_id)?.preceding)
 }
 
 /// Get tags that follow (come after) the given commit
 #[cfg(test)]
-pub fn get_tags_following_commit(repo: &Repository, commit_id: &str) -> anyhow::Result<Vec<String>> {
+pub fn get_tags_following_commit(
+    repo: &Repository,
+    commit_id: &str,
+) -> anyhow::Result<Vec<String>> {
     Ok(get_related_tags_for_commit(repo, commit_id)?.following)
 }
 
@@ -625,7 +661,10 @@ mod tests {
 
     #[test]
     fn map_status_returns_expected_labels() {
-        assert_eq!(map_status(Status::INDEX_NEW, true), Some("added".to_string()));
+        assert_eq!(
+            map_status(Status::INDEX_NEW, true),
+            Some("added".to_string())
+        );
         assert_eq!(
             map_status(Status::INDEX_MODIFIED, true),
             Some("modified".to_string())
@@ -658,7 +697,10 @@ mod tests {
         let status = get_working_tree_status(&repo).expect("status");
         let paths: Vec<String> = status.into_iter().map(|f| f.path).collect();
 
-        assert_eq!(paths, vec!["a_file.txt".to_string(), "z_file.txt".to_string()]);
+        assert_eq!(
+            paths,
+            vec!["a_file.txt".to_string(), "z_file.txt".to_string()]
+        );
     }
 
     #[test]
@@ -685,7 +727,8 @@ mod tests {
         let repo = init_repo("commit-no-staged");
         commit_file(&repo, "a.txt", "one", "initial commit");
 
-        let err = commit_staged(&repo, "new commit").expect_err("expected staged changes validation");
+        let err =
+            commit_staged(&repo, "new commit").expect_err("expected staged changes validation");
         assert!(err.to_string().contains("No staged changes to commit"));
     }
 
@@ -747,11 +790,15 @@ mod tests {
 
         create_branch(&repo, "feature/test", None).expect("create branch");
         let created = get_branches(&repo).expect("branches after create");
-        assert!(created.iter().any(|b| b.name == "feature/test" && !b.is_remote));
+        assert!(created
+            .iter()
+            .any(|b| b.name == "feature/test" && !b.is_remote));
 
         delete_branch(&repo, "feature/test").expect("delete branch");
         let after_delete = get_branches(&repo).expect("branches after delete");
-        assert!(!after_delete.iter().any(|b| b.name == "feature/test" && !b.is_remote));
+        assert!(!after_delete
+            .iter()
+            .any(|b| b.name == "feature/test" && !b.is_remote));
     }
 
     #[test]
@@ -769,10 +816,10 @@ mod tests {
         repo.branch("feature/base", &first_commit, false)
             .expect("create feature branch");
 
-        let containing_first = get_branches_containing_commit(&repo, &c1.to_string())
-            .expect("branches containing c1");
-        let containing_second = get_branches_containing_commit(&repo, &c2.to_string())
-            .expect("branches containing c2");
+        let containing_first =
+            get_branches_containing_commit(&repo, &c1.to_string()).expect("branches containing c1");
+        let containing_second =
+            get_branches_containing_commit(&repo, &c2.to_string()).expect("branches containing c2");
 
         assert!(containing_first.iter().any(|name| name == &current_branch));
         assert!(containing_first.iter().any(|name| name == "feature/base"));
@@ -787,10 +834,7 @@ mod tests {
         let c2 = commit_file(&repo, "a.txt", "two", "second commit");
 
         let c1_commit = repo.find_commit(c1).expect("commit c1");
-        let c2_obj = repo
-            .find_commit(c2)
-            .expect("commit c2")
-            .into_object();
+        let c2_obj = repo.find_commit(c2).expect("commit c2").into_object();
         let sig = Signature::now("Test", "test@example.com").expect("signature");
 
         repo.tag_lightweight("v0.1.0", c1_commit.as_object(), false)
@@ -799,8 +843,12 @@ mod tests {
             .expect("annotated tag");
 
         let tags = get_tags(&repo).expect("get tags");
-        assert!(tags.iter().any(|t| t.name == "v0.1.0" && t.commit_id == c1.to_string()));
-        assert!(tags.iter().any(|t| t.name == "v0.2.0" && t.commit_id == c2.to_string()));
+        assert!(tags
+            .iter()
+            .any(|t| t.name == "v0.1.0" && t.commit_id == c1.to_string()));
+        assert!(tags
+            .iter()
+            .any(|t| t.name == "v0.2.0" && t.commit_id == c2.to_string()));
     }
 
     #[test]
@@ -810,14 +858,8 @@ mod tests {
         let c2 = commit_file_at_time(&repo, "a.txt", "two", "second", 1_700_000_100);
         let c3 = commit_file_at_time(&repo, "a.txt", "three", "third", 1_700_000_200);
 
-        let c1_obj = repo
-            .find_commit(c1)
-            .expect("commit c1")
-            .into_object();
-        let c3_obj = repo
-            .find_commit(c3)
-            .expect("commit c3")
-            .into_object();
+        let c1_obj = repo.find_commit(c1).expect("commit c1").into_object();
+        let c3_obj = repo.find_commit(c3).expect("commit c3").into_object();
         let sig = Signature::now("Test", "test@example.com").expect("signature");
 
         repo.tag("v1.0.0", &c1_obj, &sig, "old", false)
@@ -839,14 +881,8 @@ mod tests {
         let c2 = commit_file_at_time(&repo, "a.txt", "two", "second", 1_700_001_100);
         let c3 = commit_file_at_time(&repo, "a.txt", "three", "third", 1_700_001_200);
 
-        let c1_obj = repo
-            .find_commit(c1)
-            .expect("commit c1")
-            .into_object();
-        let c3_obj = repo
-            .find_commit(c3)
-            .expect("commit c3")
-            .into_object();
+        let c1_obj = repo.find_commit(c1).expect("commit c1").into_object();
+        let c3_obj = repo.find_commit(c3).expect("commit c3").into_object();
         let sig = Signature::now("Test", "test@example.com").expect("signature");
 
         repo.tag("v2.0.0", &c1_obj, &sig, "old", false)
@@ -854,12 +890,11 @@ mod tests {
         repo.tag("v2.1.0", &c3_obj, &sig, "new", false)
             .expect("tag v2.1.0");
 
-        let related = get_related_tags_for_commit(&repo, &c2.to_string())
-            .expect("related tags");
-        let mut preceding = get_tags_preceding_commit(&repo, &c2.to_string())
-            .expect("preceding tags");
-        let mut following = get_tags_following_commit(&repo, &c2.to_string())
-            .expect("following tags");
+        let related = get_related_tags_for_commit(&repo, &c2.to_string()).expect("related tags");
+        let mut preceding =
+            get_tags_preceding_commit(&repo, &c2.to_string()).expect("preceding tags");
+        let mut following =
+            get_tags_following_commit(&repo, &c2.to_string()).expect("following tags");
 
         let mut related_preceding = related.preceding.clone();
         let mut related_following = related.following.clone();
