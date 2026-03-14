@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="./dgif-gitk-rs.gif" alt="GitK-RS Demo Screenshot" width="800" />
+  <img src="./gif-gitk-rs.gif" alt="GitK-RS Demo Screenshot" width="800" />
   <br>
   <i>GitK-RS commit graph and UI demo</i>
 </p>
