@@ -16,6 +16,12 @@
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/react-%2361DAFB.svg?logo=react&logoColor=white" alt="React"></a>
 </p>
 
+<p align="center">
+  <img src="./dgif-gitk-rs.gif" alt="GitK-RS Demo Screenshot" width="800" />
+  <br>
+  <i>GitK-RS commit graph and UI demo</i>
+</p>
+
 ---
 
 ## 🚀 Features
