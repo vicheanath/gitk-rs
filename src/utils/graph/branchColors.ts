@@ -1,16 +1,10 @@
-// Modern git log branch colors — readable on both dark and light backgrounds
-export const CLASSIC_GITK_COLORS = [
-  "#4f9cf9", // blue
-  "#30b155", // green
-  "#e67e22", // orange
-  "#9b59b6", // purple
-  "#e84393", // pink
-  "#2ecc71", // emerald
-  "#e74c3c", // red
-  "#1abc9c", // teal
-  "#f39c12", // amber
-  "#3498db", // sky blue
-];
+// Broad palette for branch-heavy repositories.
+export const CLASSIC_GITK_COLORS = Array.from({ length: 48 }, (_, i) => {
+  const hue = Math.round((i * 137.508) % 360);
+  const saturation = i % 2 === 0 ? 74 : 84;
+  const lightness = i % 2 === 0 ? 53 : 45;
+  return `hsl(${hue} ${saturation}% ${lightness}%)`;
+});
 
 export interface BranchInfo {
   name: string;
@@ -28,6 +22,20 @@ function hashString(str: string): number {
     hash = hash & hash; // Convert to 32bit integer
   }
   return Math.abs(hash);
+}
+
+export function getBranchColor(branchName: string): string {
+  const hash = hashString(branchName);
+  const hue = hash % 360;
+  const saturation = 64 + ((hash >> 8) % 18); // 64..81
+  const lightness = 46 + ((hash >> 16) % 14); // 46..59
+  return `hsl(${hue} ${saturation}% ${lightness}%)`;
+}
+
+export function getBranchBadgeTextColor(branchName: string): string {
+  const hash = hashString(branchName);
+  const lightness = 46 + ((hash >> 16) % 14);
+  return lightness >= 54 ? "#0f172a" : "#f8fafc";
 }
 
 /**
@@ -57,8 +65,7 @@ export function assignBranchColors(
     // Assign colors to branches based on branch name (consistent hash)
     const branchColorMap = new Map<string, string>();
     branches.forEach((branch) => {
-      const colorIndex = hashString(branch.name) % CLASSIC_GITK_COLORS.length;
-      branchColorMap.set(branch.name, CLASSIC_GITK_COLORS[colorIndex]);
+      branchColorMap.set(branch.name, getBranchColor(branch.name));
     });
 
     // Sort branches: current branch first, then by name for consistency

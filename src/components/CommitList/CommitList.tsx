@@ -1,7 +1,10 @@
 import { useEffect, useState, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CommitNode } from "../../types/git";
-import { CLASSIC_GITK_COLORS } from "../../utils/graph/branchColors";
+import {
+  getBranchBadgeTextColor,
+  getBranchColor,
+} from "../../utils/graph/branchColors";
 import { useSettings } from "../../context/SettingsContext";
 
 interface CommitListProps {
@@ -9,22 +12,6 @@ interface CommitListProps {
   selectedCommit?: string;
   onCommitSelect: (commitId: string) => void;
   searchQuery?: string;
-}
-
-// Hash function to get consistent color for branch name
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash);
-}
-
-function getBranchColor(branchName: string): string {
-  const colorIndex = hashString(branchName) % CLASSIC_GITK_COLORS.length;
-  return CLASSIC_GITK_COLORS[colorIndex];
 }
 
 export default function CommitList({
@@ -192,7 +179,7 @@ export default function CommitList({
                           className="inline-flex max-w-full items-center rounded border border-[var(--border-primary)] px-1.5 py-0.5 text-[10px] font-medium"
                           style={{
                             backgroundColor: getBranchColor(branchName),
-                            color: "#000",
+                            color: getBranchBadgeTextColor(branchName),
                           }}
                           title={branchName}
                         >

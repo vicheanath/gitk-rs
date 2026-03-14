@@ -1,5 +1,6 @@
 import { CommitNode } from "../../types/git";
 import { COMMIT_SUMMARY_MAX, ROW_HEIGHT } from "./constants";
+import { getBranchBadgeTextColor } from "../../utils/graph/branchColors";
 
 interface CommitTablePaneProps {
   filteredNodes: CommitNode[];
@@ -89,7 +90,10 @@ export default function CommitTablePane({
                       <span
                         key={branchName}
                         className="branch-label"
-                        style={{ backgroundColor: getBranchColor(branchName), color: "#000" }}
+                        style={{
+                          backgroundColor: getBranchColor(branchName),
+                          color: getBranchBadgeTextColor(branchName),
+                        }}
                         title={branchName}
                       >
                         {branchName}
