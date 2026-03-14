@@ -1,6 +1,6 @@
 {
   "productName": "gitk-rs",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "identifier": "com.gitk-rs.app",
   "build": {
     "beforeDevCommand": "npm run dev",

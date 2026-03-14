@@ -1,6 +1,6 @@
 [package]
 name = "gitk-rs"
-version = "1.0.3"
+version = "1.0.4"
 description = "A modern GitK clone written in Rust"
 authors = ["Vichea Nath"]
 license = "MIT"
