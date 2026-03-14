@@ -2,9 +2,92 @@ use crate::git_engine::commit::CommitNode;
 use git2::{Oid, Repository};
 use petgraph::{graph::NodeIndex, Graph};
 use std::collections::{HashMap, HashSet};
+use std::process::Command;
 
 pub struct CommitGraph {
     pub graph: Graph<CommitNode, ()>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ParsedGraphRow {
+    hash: String,
+    row: usize,
+    column: usize,
+}
+
+fn is_full_hash(token: &str) -> bool {
+    token.len() == 40 && token.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn parse_git_log_graph_output(output: &str) -> anyhow::Result<Vec<ParsedGraphRow>> {
+    let mut rows = Vec::new();
+    let mut seen = HashSet::new();
+
+    for line in output.lines() {
+        let Some(hash) = line.split_whitespace().last() else {
+            continue;
+        };
+
+        if !is_full_hash(hash) {
+            continue;
+        }
+
+        if !seen.insert(hash.to_string()) {
+            continue;
+        }
+
+        let hash_start = line
+            .rfind(hash)
+            .ok_or_else(|| anyhow::anyhow!("failed to find hash in graph line"))?;
+        let prefix = &line[..hash_start];
+        let star_index = prefix
+            .find('*')
+            .ok_or_else(|| anyhow::anyhow!("failed to find '*' in graph commit line"))?;
+
+        rows.push(ParsedGraphRow {
+            hash: hash.to_string(),
+            row: rows.len(),
+            column: star_index / 2,
+        });
+    }
+
+    if rows.is_empty() {
+        return Err(anyhow::anyhow!(
+            "no commit rows found in `git log --graph` output"
+        ));
+    }
+
+    Ok(rows)
+}
+
+fn run_git_log_graph(repo: &Repository, max_commits: usize) -> anyhow::Result<String> {
+    let repo_root = repo
+        .workdir()
+        .ok_or_else(|| anyhow::anyhow!("repository has no workdir"))?;
+
+    let output = Command::new("git")
+        .arg("--no-pager")
+        .arg("log")
+        .arg("--graph")
+        .arg("--no-color")
+        .arg("-n")
+        .arg(max_commits.to_string())
+        .arg("--pretty=format:%H")
+        .current_dir(repo_root)
+        .output()
+        .map_err(|err| anyhow::anyhow!("failed to execute `git log --graph`: {err}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(
+            "`git log --graph` exited with status {}: {}",
+            output.status,
+            stderr.trim()
+        ));
+    }
+
+    String::from_utf8(output.stdout)
+        .map_err(|err| anyhow::anyhow!("invalid UTF-8 from `git log --graph`: {err}"))
 }
 
 fn resolve_head_oid(repo: &Repository) -> anyhow::Result<Oid> {
@@ -58,7 +141,12 @@ fn connect_parent_edges(graph: &mut Graph<CommitNode, ()>, node_map: &HashMap<St
             graph[child_idx]
                 .parents
                 .iter()
-                .filter_map(|parent_id| node_map.get(parent_id).copied().map(|parent_idx| (parent_idx, child_idx)))
+                .filter_map(|parent_id| {
+                    node_map
+                        .get(parent_id)
+                        .copied()
+                        .map(|parent_idx| (parent_idx, child_idx))
+                })
                 .collect::<Vec<(NodeIndex, NodeIndex)>>()
         })
         .collect();
@@ -68,13 +156,74 @@ fn connect_parent_edges(graph: &mut Graph<CommitNode, ()>, node_map: &HashMap<St
     }
 }
 
-pub fn build_commit_graph(repo: &Repository, max_commits: Option<usize>) -> anyhow::Result<CommitGraph> {
+fn build_commit_graph_legacy(
+    repo: &Repository,
+    max_commits: Option<usize>,
+) -> anyhow::Result<CommitGraph> {
     let mut graph = Graph::<CommitNode, ()>::new();
     let head_oid = resolve_head_oid(repo)?;
     let node_map = collect_commit_nodes(repo, head_oid, max_commits.unwrap_or(1000), &mut graph)?;
     connect_parent_edges(&mut graph, &node_map);
 
     Ok(CommitGraph { graph })
+}
+
+fn build_commit_graph_from_rows(
+    repo: &Repository,
+    rows: Vec<ParsedGraphRow>,
+) -> anyhow::Result<CommitGraph> {
+    let mut graph = Graph::<CommitNode, ()>::new();
+    let mut node_map = HashMap::new();
+
+    for row in rows {
+        let oid = Oid::from_str(&row.hash)?;
+        let commit = repo.find_commit(oid)?;
+        let mut commit_node = CommitNode::from_commit(&commit);
+        commit_node.graph_row = Some(row.row);
+        commit_node.graph_col = Some(row.column);
+        let node_id = commit_node.id.clone();
+        let node_idx = graph.add_node(commit_node);
+        node_map.insert(node_id, node_idx);
+    }
+
+    connect_parent_edges(&mut graph, &node_map);
+    Ok(CommitGraph { graph })
+}
+
+fn build_commit_graph_with_runner<F>(
+    repo: &Repository,
+    max_commits: Option<usize>,
+    runner: &F,
+) -> anyhow::Result<CommitGraph>
+where
+    F: Fn(&Repository, usize) -> anyhow::Result<String>,
+{
+    let limit = max_commits.unwrap_or(1000);
+
+    if limit == 0 {
+        return build_commit_graph_legacy(repo, Some(limit));
+    }
+
+    let graph_result = runner(repo, limit)
+        .and_then(|output| parse_git_log_graph_output(&output))
+        .and_then(|rows| build_commit_graph_from_rows(repo, rows));
+
+    match graph_result {
+        Ok(graph) => Ok(graph),
+        Err(err) => {
+            eprintln!(
+                "[graph] warning: failed to build graph from `git log --graph`, falling back to legacy layout: {err}"
+            );
+            build_commit_graph_legacy(repo, Some(limit))
+        }
+    }
+}
+
+pub fn build_commit_graph(
+    repo: &Repository,
+    max_commits: Option<usize>,
+) -> anyhow::Result<CommitGraph> {
+    build_commit_graph_with_runner(repo, max_commits, &run_git_log_graph)
 }
 
 #[cfg(test)]
@@ -104,7 +253,9 @@ mod tests {
         fs::write(workdir.join(file_name), content).expect("write file");
 
         let mut index = repo.index().expect("index");
-        index.add_path(std::path::Path::new(file_name)).expect("add path");
+        index
+            .add_path(std::path::Path::new(file_name))
+            .expect("add path");
         index.write().expect("write index");
 
         let tree_id = index.write_tree().expect("write tree");
@@ -126,6 +277,44 @@ mod tests {
         oid
     }
 
+    fn checkout_branch(repo: &Repository, branch_ref: &str) {
+        let (object, reference) = repo.revparse_ext(branch_ref).expect("revparse");
+        repo.checkout_tree(&object, None).expect("checkout tree");
+        if let Some(reference) = reference {
+            repo.set_head(reference.name().expect("reference name"))
+                .expect("set head");
+        } else {
+            repo.set_head_detached(object.id()).expect("detach head");
+        }
+    }
+
+    fn commit_merge(
+        repo: &Repository,
+        file_name: &str,
+        content: &str,
+        message: &str,
+        first_parent: Oid,
+        second_parent: Oid,
+    ) -> Oid {
+        let workdir = repo.workdir().expect("workdir");
+        fs::write(workdir.join(file_name), content).expect("write file");
+
+        let mut index = repo.index().expect("index");
+        index
+            .add_path(std::path::Path::new(file_name))
+            .expect("add path");
+        index.write().expect("write index");
+
+        let tree_id = index.write_tree().expect("write tree");
+        let tree = repo.find_tree(tree_id).expect("find tree");
+        let sig = Signature::now("Test", "test@example.com").expect("signature");
+        let p1 = repo.find_commit(first_parent).expect("first parent");
+        let p2 = repo.find_commit(second_parent).expect("second parent");
+
+        repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[&p1, &p2])
+            .expect("create merge commit")
+    }
+
     #[test]
     fn builds_linear_graph_with_parent_edge() {
         let repo = init_repo("linear");
@@ -145,7 +334,10 @@ mod tests {
                 has_expected_edge = true;
             }
         }
-        assert!(has_expected_edge, "expected parent->child edge from c1 to c2");
+        assert!(
+            has_expected_edge,
+            "expected parent->child edge from c1 to c2"
+        );
     }
 
     #[test]
@@ -161,7 +353,10 @@ mod tests {
         assert_eq!(graph.node_count(), 2);
         assert_eq!(graph.edge_count(), 1);
 
-        let ids: HashSet<String> = graph.node_indices().map(|idx| graph[idx].id.clone()).collect();
+        let ids: HashSet<String> = graph
+            .node_indices()
+            .map(|idx| graph[idx].id.clone())
+            .collect();
         assert!(ids.contains(&c2.to_string()));
         assert!(ids.contains(&c3.to_string()));
         assert!(!ids.contains(&c1.to_string()));
@@ -227,5 +422,116 @@ mod tests {
         assert_eq!(latest.parents, vec![c1.to_string()]);
         assert_eq!(latest.message, "second line\nmore details");
     }
-}
 
+    #[test]
+    fn parses_git_log_graph_rows_for_merge_output() {
+        let h1 = "1111111111111111111111111111111111111111";
+        let h2 = "2222222222222222222222222222222222222222";
+        let h3 = "3333333333333333333333333333333333333333";
+        let h4 = "4444444444444444444444444444444444444444";
+        let output = format!("*   {h1}\n|\\  \n| * {h2}\n| * {h3}\n|/  \n* {h4}\n");
+
+        let parsed = parse_git_log_graph_output(&output).expect("parse graph output");
+        let actual: Vec<(String, usize, usize)> = parsed
+            .into_iter()
+            .map(|row| (row.hash, row.row, row.column))
+            .collect();
+
+        let expected = vec![
+            (h1.to_string(), 0, 0),
+            (h2.to_string(), 1, 1),
+            (h3.to_string(), 2, 1),
+            (h4.to_string(), 3, 0),
+        ];
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn build_graph_assigns_cli_row_and_column_hints() {
+        let repo = init_repo("graph-hints");
+        let base = commit_file(&repo, "a.txt", "base", "base");
+
+        let default_branch = repo
+            .head()
+            .expect("head")
+            .shorthand()
+            .expect("branch name")
+            .to_string();
+
+        let base_commit = repo.find_commit(base).expect("base commit");
+        repo.branch("feature", &base_commit, false)
+            .expect("create feature branch");
+
+        checkout_branch(&repo, "refs/heads/feature");
+        let feature_commit = commit_file(&repo, "feature.txt", "feature", "feature");
+
+        checkout_branch(&repo, &format!("refs/heads/{default_branch}"));
+        let main_commit = commit_file(&repo, "main.txt", "main", "main");
+        let _merge_commit = commit_merge(
+            &repo,
+            "merge.txt",
+            "merged",
+            "merge",
+            main_commit,
+            feature_commit,
+        );
+
+        let expected_rows = run_git_log_graph(&repo, 50)
+            .and_then(|output| parse_git_log_graph_output(&output))
+            .expect("expected rows from git log");
+
+        let commit_graph = build_commit_graph(&repo, Some(50)).expect("build graph");
+        let graph = commit_graph.graph;
+        let actual: HashMap<String, (Option<usize>, Option<usize>)> = graph
+            .node_indices()
+            .map(|idx| {
+                (
+                    graph[idx].id.clone(),
+                    (graph[idx].graph_row, graph[idx].graph_col),
+                )
+            })
+            .collect();
+
+        assert_eq!(actual.len(), expected_rows.len());
+        for row in expected_rows {
+            let got = actual.get(&row.hash).expect("commit present in graph");
+            assert_eq!(got.0, Some(row.row));
+            assert_eq!(got.1, Some(row.column));
+        }
+    }
+
+    #[test]
+    fn falls_back_to_legacy_graph_when_cli_runner_fails() {
+        let repo = init_repo("cli-fallback");
+        let c1 = commit_file(&repo, "a.txt", "one", "first");
+        let c2 = commit_file(&repo, "a.txt", "two", "second");
+
+        let failing_runner = |_repo: &Repository, _max_commits: usize| -> anyhow::Result<String> {
+            Err(anyhow::anyhow!("forced runner failure"))
+        };
+
+        let commit_graph =
+            build_commit_graph_with_runner(&repo, Some(100), &failing_runner).expect("build graph");
+        let graph = commit_graph.graph;
+
+        assert_eq!(graph.node_count(), 2);
+        assert_eq!(graph.edge_count(), 1);
+
+        let latest = graph
+            .node_indices()
+            .map(|idx| &graph[idx])
+            .find(|node| node.id == c2.to_string())
+            .expect("latest node");
+        let first = graph
+            .node_indices()
+            .map(|idx| &graph[idx])
+            .find(|node| node.id == c1.to_string())
+            .expect("first node");
+
+        assert!(latest.graph_row.is_none());
+        assert!(latest.graph_col.is_none());
+        assert!(first.graph_row.is_none());
+        assert!(first.graph_col.is_none());
+    }
+}

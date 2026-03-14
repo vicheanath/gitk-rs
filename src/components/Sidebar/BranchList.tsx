@@ -104,6 +104,10 @@ export default function BranchList() {
   const [error, setError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  const toolbarBtnClass =
+    "inline-flex h-5 w-5 items-center justify-center rounded bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-secondary)] disabled:cursor-not-allowed disabled:opacity-50";
+  const rowClass =
+    "group flex items-center justify-between gap-2 rounded px-1.5 py-0.5 text-[11px] transition-colors hover:bg-[var(--bg-secondary)]";
 
   const loadBranches = () => {
     setLoading(true);
@@ -151,23 +155,23 @@ export default function BranchList() {
     if (node.type === "folder") {
       const expanded = expandedFolders.has(node.path);
       return (
-        <li key={`folder:${node.path}`} className="space-y-1">
+        <li key={`folder:${node.path}`} className="space-y-0.5">
           <button
             type="button"
-            className="flex w-full items-center gap-1 rounded px-2 py-1 text-left text-xs text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-secondary)]"
+            className="flex w-full items-center gap-1 rounded px-1.5 py-0.5 text-left text-[11px] text-[var(--text-secondary)] transition-colors hover:bg-[var(--bg-secondary)]"
             onClick={() => toggleFolder(node.path)}
-            style={{ paddingLeft: `${level * 16 + 8}px` }}
+            style={{ paddingLeft: `${level * 14 + 8}px` }}
           >
             <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--text-muted)]">
-              {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </span>
             <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--text-muted)]">
-              <Folder size={12} />
+              <Folder size={11} />
             </span>
             <span className="truncate font-medium text-[var(--text-secondary)]">{node.name}</span>
           </button>
           {expanded && node.children.length > 0 && (
-            <ul className="space-y-1">
+            <ul className="space-y-0.5">
               {node.children.map((child) => renderBranchNode(child, level + 1))}
             </ul>
           )}
@@ -179,19 +183,17 @@ export default function BranchList() {
     return (
       <li
         key={branch.name}
-        className={`group flex items-center justify-between gap-2 rounded px-2 py-1 text-xs transition-colors hover:bg-[var(--bg-secondary)] ${
-          branch.is_current ? "bg-[var(--bg-secondary)]" : ""
-        }`}
+        className={`${rowClass} ${branch.is_current ? "bg-[var(--bg-secondary)]" : ""}`}
         title={branch.commit_id.substring(0, 8)}
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
+        style={{ paddingLeft: `${level * 14 + 8}px` }}
       >
         <div className="flex min-w-0 items-center gap-1.5">
           {branch.is_current && (
             <span className="inline-flex h-3 w-3 items-center justify-center text-[var(--accent-primary)]">
-              <CircleDot size={12} />
+              <CircleDot size={11} />
             </span>
           )}
-          <span className="truncate font-medium text-[var(--text-primary)]">
+          <span className="truncate text-[11px] font-medium text-[var(--text-primary)]">
             {branch.name.split("/").pop() ?? branch.name}
           </span>
           {branch.is_remote && (
@@ -205,31 +207,36 @@ export default function BranchList() {
             <>
               <Button
                 type="button"
+                variant="ghost"
                 size="icon"
+                className={toolbarBtnClass}
                 onClick={() => handleCheckout(branch.name)}
                 title="Checkout"
               >
-                <Check size={14} />
+                <Check size={11} />
               </Button>
               <Button
                 type="button"
-                variant="destructive"
+                variant="ghost"
                 size="icon"
+                className={`${toolbarBtnClass} text-[var(--danger)]`}
                 onClick={() => handleDelete(branch.name)}
                 title="Delete"
               >
-                <Trash2 size={14} />
+                <Trash2 size={11} />
               </Button>
             </>
           )}
           {!branch.is_current && branch.is_remote && (
             <Button
               type="button"
+              variant="ghost"
               size="icon"
+              className={toolbarBtnClass}
               onClick={() => handleCheckout(branch.name)}
               title="Checkout"
             >
-              <Check size={14} />
+              <Check size={11} />
             </Button>
           )}
         </div>
@@ -259,36 +266,53 @@ export default function BranchList() {
   };
 
   if (loading) {
-    return <div className="px-2 py-4 text-xs text-[var(--text-secondary)]">Loading branches...</div>;
+    return (
+      <div className="space-y-2 px-1.5 pb-2">
+        <div className="rounded bg-[var(--bg-secondary)] px-3 py-4 text-xs text-[var(--text-secondary)]">
+          Loading branches...
+        </div>
+      </div>
+    );
   }
 
   if (error) {
-    return <div className="px-2 py-4 text-xs text-[var(--danger)]">Error: {error}</div>;
+    return (
+      <div className="space-y-2 px-1.5 pb-2">
+        <div className="rounded bg-[var(--danger)]/10 px-2 py-1 text-xs text-[var(--danger)]">
+          Error: {error}
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-1.5 px-1 py-1">
-      <div className="flex items-center justify-between gap-2 px-1">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
-          Branches ({branches.length})
-        </h3>
+    <div className="space-y-2 px-1.5 pb-2">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">
+            Branches
+          </h3>
+          <span className="text-[9px] text-[var(--text-muted)]">
+            {branches.length} total
+          </span>
+        </div>
         <div className="flex items-center gap-1">
-          <Button
+          <button
             type="button"
-            size="icon"
+            className={toolbarBtnClass}
             onClick={() => setShowCreateDialog(true)}
             title="Create Branch"
           >
-            <Plus size={14} />
-          </Button>
-          <Button
+            <Plus size={11} />
+          </button>
+          <button
             type="button"
-            size="icon"
+            className={toolbarBtnClass}
             onClick={loadBranches}
             title="Refresh"
           >
-            <RefreshCw size={14} />
-          </Button>
+            <RefreshCw size={11} />
+          </button>
         </div>
       </div>
       <CreateBranchDialog
@@ -296,10 +320,17 @@ export default function BranchList() {
         onClose={() => setShowCreateDialog(false)}
         onCreated={loadBranches}
       />
-      <ul className="space-y-0.5">
-        {branchTree.map((node) => renderBranchNode(node))}
-      </ul>
+      <section className="space-y-1.5 rounded bg-[var(--bg-secondary)] p-1.5">
+        {branchTree.length === 0 ? (
+          <div className="px-1.5 py-0.5 text-[11px] text-[var(--text-muted)]">
+            No branches found
+          </div>
+        ) : (
+          <ul className="space-y-0.5">
+            {branchTree.map((node) => renderBranchNode(node))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
-

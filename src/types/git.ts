@@ -8,6 +8,8 @@ export interface CommitNode {
   message: string;
   time: number;
   summary: string;
+  graph_row?: number;
+  graph_col?: number;
 }
 
 export interface Branch {

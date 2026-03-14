@@ -360,6 +360,60 @@ export function computeGitKLayout(
     return { positions: new Map(), sortedNodes: [], layoutCommits: [], width: 0, height: 0 };
   }
 
+  const hasGraphHints = nodes.every(
+    (node) => node.graph_row !== undefined && node.graph_col !== undefined
+  );
+
+  if (hasGraphHints) {
+    const sortedByGraphRow = [...nodes].sort((a, b) => {
+      const rowDiff = (a.graph_row ?? 0) - (b.graph_row ?? 0);
+      if (rowDiff !== 0) return rowDiff;
+      return b.time - a.time;
+    });
+    const limitedNodes = sortedByGraphRow.slice(0, maxCommits);
+    const limitedNodeIds = new Set(limitedNodes.map((node) => node.id));
+    const layoutCommits = limitedNodes.map((node, row) => ({
+      hash: node.id,
+      row,
+      column: node.graph_col ?? 0,
+      parents: node.parents.filter((parent) => limitedNodeIds.has(parent)),
+      parentColumns: [] as number[],
+    }));
+
+    const layoutByHash = new Map(layoutCommits.map((entry) => [entry.hash, entry]));
+    for (const entry of layoutCommits) {
+      entry.parentColumns = entry.parents.map((parentHash) => {
+        const parent = layoutByHash.get(parentHash);
+        return parent ? parent.column : -1;
+      });
+    }
+
+    const positions = new Map<string, NodePosition>();
+    let maxLane = 0;
+    for (const entry of layoutCommits) {
+      maxLane = Math.max(maxLane, entry.column);
+      positions.set(entry.hash, {
+        x: GRAPH_LEFT_PADDING + entry.column * COLUMN_WIDTH,
+        y: entry.row * ROW_HEIGHT + ROW_HEIGHT / 2,
+        lane: entry.column,
+        row: entry.row,
+      });
+    }
+
+    const width =
+      layoutCommits.length === 0
+        ? 0
+        : GRAPH_LEFT_PADDING + (maxLane + 1) * COLUMN_WIDTH + GRAPH_RIGHT_PADDING;
+
+    return {
+      positions,
+      sortedNodes: limitedNodes,
+      layoutCommits,
+      width,
+      height: limitedNodes.length * ROW_HEIGHT,
+    };
+  }
+
   const internal: InternalCommit[] = nodes
     .map((node, index) => ({
       hash: node.id,

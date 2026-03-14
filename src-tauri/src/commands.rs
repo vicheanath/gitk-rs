@@ -308,6 +308,7 @@ pub fn open_repository(path: String) -> Result<(), String> {
 pub fn get_commit_graph(max_commits: Option<usize>) -> Result<CommitGraphResponse, String> {
     let repo = get_repo()?;
     let limit = max_commits.unwrap_or(1000);
+    const COMMIT_GRAPH_CACHE_VERSION: &str = "graph-v2";
 
     // Resolve HEAD so we can use it as a cache key.
     let head_oid = repo
@@ -316,6 +317,7 @@ pub fn get_commit_graph(max_commits: Option<usize>) -> Result<CommitGraphRespons
         .and_then(|h| h.target())
         .map(|oid| oid.to_string())
         .unwrap_or_default();
+    let cache_head_key = format!("{head_oid}:{COMMIT_GRAPH_CACHE_VERSION}");
 
     let repo_path = repo
         .workdir()
@@ -326,7 +328,7 @@ pub fn get_commit_graph(max_commits: Option<usize>) -> Result<CommitGraphRespons
     let cache = get_cache();
 
     // Cache hit: deserialise and return immediately.
-    if let Some(json) = cache.get_commit_graph(&repo_path, &head_oid, limit) {
+    if let Some(json) = cache.get_commit_graph(&repo_path, &cache_head_key, limit) {
         if let Ok(response) = serde_json::from_str::<CommitGraphResponse>(&json) {
             return Ok(response);
         }
@@ -359,7 +361,7 @@ pub fn get_commit_graph(max_commits: Option<usize>) -> Result<CommitGraphRespons
 
     // Persist to cache (fire-and-forget; serialisation failure is non-fatal).
     if let Ok(json) = serde_json::to_string(&response) {
-        cache.put_commit_graph(&repo_path, &head_oid, limit, &json);
+        cache.put_commit_graph(&repo_path, &cache_head_key, limit, &json);
     }
 
     Ok(response)

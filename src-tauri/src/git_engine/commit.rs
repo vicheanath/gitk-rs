@@ -9,6 +9,8 @@ pub struct CommitNode {
     pub message: String,
     pub time: i64,
     pub summary: String,
+    pub graph_row: Option<usize>,
+    pub graph_col: Option<usize>,
 }
 
 impl CommitNode {
@@ -25,6 +27,8 @@ impl CommitNode {
             message: message.to_string(),
             time: author.when().seconds(),
             summary,
+            graph_row: None,
+            graph_col: None,
         }
     }
 }
@@ -100,4 +104,3 @@ mod tests {
         assert_eq!(node.parents, vec![p1.to_string()]);
     }
 }
-
