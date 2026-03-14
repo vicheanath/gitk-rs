@@ -18,6 +18,8 @@ const C = {
   lnText:   "var(--text-secondary)",
   border:   "color-mix(in srgb, var(--border-color) 68%, transparent)",
   text:     "var(--text-primary)",
+  metaBg:   "color-mix(in srgb, var(--bg-secondary) 88%, transparent)",
+  metaText: "var(--text-secondary)",
   addBg:    "var(--diff-add-bg)",
   addLnBg:  "color-mix(in srgb, var(--diff-add-border) 26%, var(--bg-secondary))",
   addText:  "var(--diff-add-text)",
@@ -48,7 +50,7 @@ function charDiff(a: string, b: string): [Seg[], Seg[]] {
   return [build(a, s, ae), build(b, s, be)];
 }
 
-type LineKind = "added" | "removed" | "context" | "hunk";
+type LineKind = "added" | "removed" | "context" | "hunk" | "meta";
 
 interface DiffLine {
   kind: LineKind;
@@ -62,26 +64,64 @@ interface DiffLine {
 function parseDiff(text: string): DiffLine[] {
   const lines: DiffLine[] = [];
   let oldNo = 0, newNo = 0;
+  let inHunk = false;
 
   for (const raw of text.split("\n")) {
     if (
       raw.startsWith("diff ") || raw.startsWith("index ") ||
-      raw.startsWith("--- ")  || raw.startsWith("+++ ")  ||
-      raw.startsWith("Binary ")
-    ) continue;
+      raw.startsWith("--- ")  || raw.startsWith("+++ ")
+    ) {
+      inHunk = false;
+      continue;
+    }
 
     if (raw.startsWith("@@")) {
       const m = raw.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (m) { oldNo = parseInt(m[1]) - 1; newNo = parseInt(m[2]) - 1; }
+      inHunk = true;
       lines.push({ kind: "hunk", content: raw, oldNo: null, newNo: null });
-    } else if (raw.startsWith("-") && !raw.startsWith("---")) {
-      lines.push({ kind: "removed", content: raw.slice(1), oldNo: ++oldNo, newNo: null });
-    } else if (raw.startsWith("+") && !raw.startsWith("+++")) {
-      lines.push({ kind: "added", content: raw.slice(1), oldNo: null, newNo: ++newNo });
-    } else {
-      const txt = raw.startsWith(" ") ? raw.slice(1) : raw;
-      lines.push({ kind: "context", content: txt, oldNo: ++oldNo, newNo: ++newNo });
+      continue;
     }
+
+    if (
+      raw.startsWith("new file mode ") ||
+      raw.startsWith("deleted file mode ") ||
+      raw.startsWith("similarity index ") ||
+      raw.startsWith("rename from ") ||
+      raw.startsWith("rename to ") ||
+      raw.startsWith("old mode ") ||
+      raw.startsWith("new mode ") ||
+      raw.startsWith("Binary files ") ||
+      raw.startsWith("GIT binary patch") ||
+      raw.startsWith("\\ No newline at end of file")
+    ) {
+      lines.push({ kind: "meta", content: raw, oldNo: null, newNo: null });
+      continue;
+    }
+
+    if (!inHunk) {
+      if (raw.trim().length > 0) {
+        lines.push({ kind: "meta", content: raw, oldNo: null, newNo: null });
+      }
+      continue;
+    }
+
+    if (raw.startsWith("-") && !raw.startsWith("---")) {
+      lines.push({ kind: "removed", content: raw.slice(1), oldNo: ++oldNo, newNo: null });
+      continue;
+    }
+
+    if (raw.startsWith("+") && !raw.startsWith("+++")) {
+      lines.push({ kind: "added", content: raw.slice(1), oldNo: null, newNo: ++newNo });
+      continue;
+    }
+
+    if (raw.startsWith(" ")) {
+      lines.push({ kind: "context", content: raw.slice(1), oldNo: ++oldNo, newNo: ++newNo });
+      continue;
+    }
+
+    lines.push({ kind: "meta", content: raw, oldNo: null, newNo: null });
   }
 
   // Trim trailing blank context
@@ -132,6 +172,19 @@ function HunkRow({ content }: { content: string }) {
       <td style={{ ...LN, background: "transparent" }} />
       <td style={{ width: 20 }} />
       <td style={{ ...MONO, padding: "2px 16px", color: C.hunkText, whiteSpace: "pre", borderBottom: `1px solid ${C.border}` }}>{content}</td>
+    </tr>
+  );
+}
+
+function MetaRow({ content }: { content: string }) {
+  return (
+    <tr style={{ background: C.metaBg }}>
+      <td style={{ ...LN, background: "transparent", borderRight: "none" }} />
+      <td style={{ ...LN, background: "transparent" }} />
+      <td style={{ ...MONO, width: 20, textAlign: "center", color: C.metaText, borderBottom: `1px solid ${C.border}` }}> </td>
+      <td style={{ ...MONO, padding: "0 16px", color: C.metaText, whiteSpace: "pre", borderBottom: `1px solid ${C.border}` }}>
+        {content || " "}
+      </td>
     </tr>
   );
 }
@@ -203,7 +256,10 @@ const CodeMirrorDiffViewer = forwardRef<HTMLDivElement, CodeMirrorDiffViewerProp
         <span style={{ fontSize: 12, color: C.lnText }}>Loading…</span>
       </div>
     );
-    if (!content) return (
+
+    const isEmptyDocument = viewMode !== "diff" && content === "";
+
+    if (!content && !isEmptyDocument) return (
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", background: C.bg }}>
         <span style={{ fontSize: 12, color: C.lnText }}>No changes</span>
       </div>
@@ -214,9 +270,17 @@ const CodeMirrorDiffViewer = forwardRef<HTMLDivElement, CodeMirrorDiffViewerProp
         <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "auto" }}>
           <tbody>
             {parsed
-              ? parsed.map((l, i) => l.kind === "hunk"
-                  ? <HunkRow key={i} content={l.content} />
-                  : <DiffRow key={i} line={l} />)
+              ? parsed.map((l, i) => {
+                  if (l.kind === "hunk") {
+                    return <HunkRow key={i} content={l.content} />;
+                  }
+
+                  if (l.kind === "meta") {
+                    return <MetaRow key={i} content={l.content} />;
+                  }
+
+                  return <DiffRow key={i} line={l} />;
+                })
               : rawLines?.map((l, i) => (
                   <RawRow key={i} lineNo={i + 1} content={l} changed={changedSet.has(i + 1)} vm={viewMode as "old" | "new"} />
                 ))

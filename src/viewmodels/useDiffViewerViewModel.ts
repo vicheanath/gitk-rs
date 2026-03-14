@@ -16,6 +16,12 @@ interface UseDiffViewerViewModelProps {
   showAllFilesInDiff?: boolean;
 }
 
+interface FileContentResponse {
+  content: string;
+  exists: boolean;
+  is_binary: boolean;
+}
+
 export function useDiffViewerViewModel({
   commitId,
   files,
@@ -97,7 +103,7 @@ export function useDiffViewerViewModel({
 
         for (const file of targetFiles) {
           try {
-            const fileContent = await invoke<string>("get_file_content", {
+            const fileResponse = await invoke<FileContentResponse>("get_file_content", {
               oid: commitId,
               filePath: file.path,
               isOld,
@@ -107,12 +113,27 @@ export function useDiffViewerViewModel({
               return;
             }
 
+            const fallbackMissingMessage = isOld
+              ? file.status === "added"
+                ? "(File does not exist in old version)"
+                : "(File not present in old version)"
+              : file.status === "deleted"
+                ? "(File was deleted)"
+                : "(File not present in new version)";
+
+            const contentToRender = !fileResponse.exists
+              ? fallbackMissingMessage
+              : fileResponse.is_binary
+                ? "(Binary file content is not displayable)"
+                : fileResponse.content;
+
             if (targetFiles.length === 1) {
-              fileContents.push(fileContent);
-              selectedFileContentLoaded = true;
+              fileContents.push(contentToRender);
+              selectedFileContentLoaded =
+                fileResponse.exists && !fileResponse.is_binary;
             } else {
               fileContents.push(`\n=== ${file.path} ===\n`);
-              fileContents.push(fileContent);
+              fileContents.push(contentToRender);
             }
           } catch (error) {
             if (cancelled) {

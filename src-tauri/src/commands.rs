@@ -287,7 +287,11 @@ pub fn get_diff(
 }
 
 #[tauri::command]
-pub fn get_file_content(oid: String, file_path: String, is_old: bool) -> Result<String, String> {
+pub fn get_file_content(
+    oid: String,
+    file_path: String,
+    is_old: bool,
+) -> Result<FileContentResponse, String> {
     let repo = get_repo()?;
     let commit_oid = git2::Oid::from_str(&oid).map_err(|e| e.to_string())?;
     let commit = repo.find_commit(commit_oid).map_err(|e| e.to_string())?;
@@ -297,24 +301,41 @@ pub fn get_file_content(oid: String, file_path: String, is_old: bool) -> Result<
         if let Ok(parent) = commit.parent(0) {
             parent.tree().map_err(|e| e.to_string())?
         } else {
-            // No parent - return empty for initial commit
-            return Ok(String::new());
+            // No parent: the "old" side of an initial commit has no file.
+            return Ok(FileContentResponse {
+                content: String::new(),
+                exists: false,
+                is_binary: false,
+            });
         }
     } else {
         // Get current tree for new version
         commit.tree().map_err(|e| e.to_string())?
     };
     
-    // Check if file exists in the tree
+    // Distinguish "missing file" from an existing-but-empty file.
     match tree.get_path(Path::new(&file_path)) {
         Ok(entry) => {
             let blob = repo.find_blob(entry.id()).map_err(|e| e.to_string())?;
-            let content = blob.content();
-            Ok(String::from_utf8_lossy(content).to_string())
+            let is_binary = blob.is_binary();
+            let content = if is_binary {
+                String::new()
+            } else {
+                String::from_utf8_lossy(blob.content()).to_string()
+            };
+
+            Ok(FileContentResponse {
+                content,
+                exists: true,
+                is_binary,
+            })
         }
         Err(_) => {
-            // File doesn't exist in this version
-            Ok(String::new())
+            Ok(FileContentResponse {
+                content: String::new(),
+                exists: false,
+                is_binary: false,
+            })
         }
     }
 }
@@ -666,6 +687,13 @@ pub struct ChangedFile {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct FileContentResponse {
+    pub content: String,
+    pub exists: bool,
+    pub is_binary: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ProviderRepository {
     pub id: String,
     pub name: String,
@@ -1006,4 +1034,3 @@ mod tests {
         assert_eq!(guide.size, Some(content.len() as u64));
     }
 }
-
